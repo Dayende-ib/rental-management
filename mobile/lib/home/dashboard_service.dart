@@ -1,39 +1,61 @@
 import '../core/api_client.dart';
 import '../core/models.dart';
-import '../core/constants.dart';
 
-/// Service for handling dashboard-related API calls
+/// Service for handling dashboard-related API calls (DEMO MODE)
 class DashboardService {
   final ApiClient _apiClient = ApiClient();
 
-  /// Get dashboard data including tenant info, property, and payments
+  /// Get dashboard data including tenant info, property, and payments (DEMO MODE)
   Future<DashboardData> getDashboardData() async {
     try {
-      // Fetch tenant profile
-      final tenantResponse = await _apiClient.get(AppConstants.tenantProfileEndpoint);
-      final tenant = Tenant.fromJson(tenantResponse['data']);
+      // DEMO MODE - Return fake data
+      await Future.delayed(const Duration(milliseconds: 800)); // Simulate network delay
       
-      // Fetch property info (assuming it's in tenant response or separate endpoint)
-      final property = Property.fromJson(tenantResponse['property'] ?? {});
+      final tenant = Tenant(
+        id: 'demo_user_123',
+        name: 'Jean Dupont',
+        email: 'jean.dupont@example.com',
+        phone: '+33 6 12 34 56 78',
+      );
       
-      // Fetch upcoming payments
-      final paymentsResponse = await _apiClient.get(AppConstants.paymentsEndpoint);
-      final payments = (paymentsResponse['data'] as List)
-          .map((item) => Payment.fromJson(item))
-          .toList();
+      final property = Property(
+        id: 'prop_456',
+        address: '123 Rue de la Paix',
+        city: 'Paris',
+        postalCode: '75001',
+        monthlyRent: 1200.00,
+      );
       
-      // Count pending maintenance requests
-      final maintenanceResponse = await _apiClient.get(AppConstants.maintenanceEndpoint);
-      final maintenanceRequests = (maintenanceResponse['data'] as List)
-          .map((item) => MaintenanceRequest.fromJson(item))
-          .where((request) => request.status == 'pending')
-          .toList();
+      final payments = [
+        Payment(
+          id: 'pay_001',
+          month: 'Janvier 2024',
+          amount: 1200.00,
+          status: 'paid',
+          dueDate: DateTime(2024, 1, 5),
+          paidDate: DateTime(2024, 1, 3),
+        ),
+        Payment(
+          id: 'pay_002',
+          month: 'Février 2024',
+          amount: 1200.00,
+          status: 'unpaid',
+          dueDate: DateTime(2024, 2, 5),
+        ),
+        Payment(
+          id: 'pay_003',
+          month: 'Mars 2024',
+          amount: 1200.00,
+          status: 'unpaid',
+          dueDate: DateTime(2024, 3, 5),
+        ),
+      ];
       
       return DashboardData(
         tenant: tenant,
         property: property,
-        upcomingPayments: payments.take(3).toList(), // Show only next 3 payments
-        pendingMaintenanceRequests: maintenanceRequests.length,
+        upcomingPayments: payments,
+        pendingMaintenanceRequests: 2,
       );
     } catch (e) {
       throw Exception('Failed to load dashboard data: $e');

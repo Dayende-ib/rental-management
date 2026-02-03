@@ -33,6 +33,22 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Tableau de bord'),
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'DÉMO',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () {
@@ -280,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (payments.isEmpty)
               const Text('Aucun paiement à venir')
             else
-              ...payments.map((payment) => _buildPaymentItem(payment)).toList(),
+              ...payments.map((payment) => _buildPaymentItem(payment)),
           ],
         ),
       ),

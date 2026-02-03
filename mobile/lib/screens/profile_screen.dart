@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../auth/auth_service.dart';
 import '../core/models.dart';
-import '../home/dashboard_service.dart';
 import '../core/constants.dart';
 
-/// Profile screen showing tenant information and logout option
+/// Profile screen showing tenant information and logout option (DEMO MODE)
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -14,8 +13,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
-  final DashboardService _dashboardService = DashboardService();
-  late Future<Tenant?> _tenantFuture;
+  late Future<Tenant> _tenantFuture;
 
   @override
   void initState() {
@@ -25,7 +23,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _loadTenantData() {
     setState(() {
-      _tenantFuture = _dashboardService.getDashboardData().then((data) => data.tenant);
+      // DEMO MODE - Return fake tenant data
+      _tenantFuture = Future.delayed(
+        const Duration(milliseconds: 500),
+        () => Tenant(
+          id: 'demo_user_123',
+          name: 'Jean Dupont',
+          email: 'jean.dupont@example.com',
+          phone: '+33 6 12 34 56 78',
+        ),
+      );
     });
   }
 
@@ -89,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }
 
-          final tenant = snapshot.data;
+          final tenant = snapshot.data!;
           return RefreshIndicator(
             onRefresh: () async => _loadTenantData(),
             child: SingleChildScrollView(
@@ -157,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Build profile header with avatar and name
-  Widget _buildProfileHeader(Tenant? tenant) {
+  Widget _buildProfileHeader(Tenant tenant) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.largePadding),
@@ -174,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              tenant?.name ?? 'Chargement...',
+              tenant.name,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -195,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Build contact information section
-  Widget _buildContactInfo(Tenant? tenant) {
+  Widget _buildContactInfo(Tenant tenant) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -215,14 +222,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ListTile(
               leading: const Icon(Icons.email, color: Colors.blue),
               title: const Text('Email'),
-              subtitle: Text(tenant?.email ?? 'Chargement...'),
+              subtitle: Text(tenant.email),
             ),
             
             // Phone
             ListTile(
               leading: const Icon(Icons.phone, color: Colors.green),
               title: const Text('Téléphone'),
-              subtitle: Text(tenant?.phone ?? 'Chargement...'),
+              subtitle: Text(tenant.phone),
             ),
           ],
         ),

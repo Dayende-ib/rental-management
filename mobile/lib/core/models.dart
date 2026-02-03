@@ -1,4 +1,5 @@
 /// Data models for the Rental Management application
+library;
 
 /// Tenant profile model
 class Tenant {

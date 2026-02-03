@@ -6,27 +6,29 @@ import '../core/constants.dart';
 class AuthService {
   final ApiClient _apiClient = ApiClient();
 
-  /// Login with email and password
+  /// Login with email and password (DEMO MODE)
   /// Returns true if login successful, false otherwise
   Future<bool> login(String email, String password) async {
     try {
-      final response = await _apiClient.post(
-        AppConstants.loginEndpoint,
-        body: {
-          'email': email,
-          'password': password,
-        },
-        requiresAuth: false, // Login doesn't require auth token
-      );
-
-      // Extract token and user info from response
-      final token = response['token'] as String?;
-      final userId = response['user']?['id'] as String?;
-
-      if (token != null && userId != null) {
-        // Save token and user ID to local storage
-        await StorageService.saveToken(token);
-        await StorageService.saveUserId(userId);
+      // DEMO MODE - Accept predefined credentials
+      if (email == 'locataire@example.com' && password == 'motdepasse123') {
+        // Generate fake token and user ID
+        const fakeToken = 'fake_jwt_token_demo_12345';
+        const fakeUserId = 'demo_user_123';
+        
+        // Save to local storage
+        await StorageService.saveToken(fakeToken);
+        await StorageService.saveUserId(fakeUserId);
+        return true;
+      }
+      
+      // Also accept any non-empty credentials for demo purposes
+      if (email.isNotEmpty && password.isNotEmpty) {
+        const fakeToken = 'fake_jwt_token_demo_any';
+        const fakeUserId = 'demo_user_any';
+        
+        await StorageService.saveToken(fakeToken);
+        await StorageService.saveUserId(fakeUserId);
         return true;
       }
 
