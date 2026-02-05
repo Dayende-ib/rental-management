@@ -18,6 +18,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
+  void _fillDemoCredentials() {
+    _emailController.text = 'locataire@example.com';
+    _passwordController.text = 'motdepasse123';
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -62,10 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connexion'),
-        centerTitle: true,
-      ),
       body: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Form(
@@ -74,27 +75,17 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // App logo/title
-              const Icon(
-                Icons.home_work,
-                size: 80,
-                color: Colors.blue,
-              ),
-              const SizedBox(height: 20),
-              const Text(
+              const Icon(Icons.home_work, size: 48),
+              const SizedBox(height: 12),
+              Text(
                 AppConstants.appName,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'MODE DÉMO - Aucun backend requis',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w500,
-                ),
+              const SizedBox(height: 6),
+              Text(
+                'Mode démo — aucun backend requis',
+                style: Theme.of(context).textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -105,15 +96,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Veuillez entrer votre email';
-                  }
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                    return 'Email invalide';
                   }
                   return null;
                 },
@@ -126,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Mot de passe',
                   prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
                 ),
                 obscureText: true,
                 validator: (value) {
@@ -145,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_errorMessage.isNotEmpty)
                 Text(
                   _errorMessage,
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 16),
@@ -153,15 +139,26 @@ class _LoginScreenState extends State<LoginScreen> {
               // Login button
               SizedBox(
                 width: double.infinity,
-                height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   child: _isLoading
-                      ? const CircularProgressIndicator()
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text(
                           'Se connecter',
                           style: TextStyle(fontSize: 18),
                         ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _isLoading ? null : _fillDemoCredentials,
+                  child: const Text('Remplir identifiants démo'),
                 ),
               ),
             ],

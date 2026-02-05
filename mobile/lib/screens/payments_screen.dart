@@ -18,7 +18,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPayments();
+    _paymentsFuture = _paymentService.getPayments();
   }
 
   void _loadPayments() {
@@ -75,7 +75,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Paiements'),
-        centerTitle: true,
       ),
       body: FutureBuilder<List<Payment>>(
         future: _paymentsFuture,
@@ -123,13 +122,13 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           if (index != 1) { // Don't navigate if already on this screen
             switch (index) {
               case 0:
-                Navigator.pushNamed(context, '/home');
+                Navigator.pushReplacementNamed(context, '/home');
                 break;
               case 2:
-                Navigator.pushNamed(context, '/maintenance');
+                Navigator.pushReplacementNamed(context, '/maintenance');
                 break;
               case 3:
-                Navigator.pushNamed(context, '/profile');
+                Navigator.pushReplacementNamed(context, '/profile');
                 break;
             }
           }
@@ -171,10 +170,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               children: [
                 Text(
                   payment.month,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -182,14 +178,15 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: payment.isPaid ? Colors.green : Colors.orange,
+                    color: const Color(AppColors.surface),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(AppColors.border)),
                   ),
                   child: Text(
                     payment.isPaid ? 'Payé' : 'À payer',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      color: Color(AppColors.textPrimary),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -200,15 +197,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             // Amount
             Row(
               children: [
-                const Icon(Icons.euro, color: Colors.green),
+                const Icon(Icons.euro, color: Color(AppColors.textMuted)),
                 const SizedBox(width: 8),
                 Text(
                   '${payment.amount.toStringAsFixed(2)} €',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ],
             ),
@@ -217,11 +210,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             // Due date
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                const Icon(Icons.calendar_today, size: 16, color: Color(AppColors.textMuted)),
                 const SizedBox(width: 8),
                 Text(
                   'Échéance: ${_formatDate(payment.dueDate)}',
-                  style: const TextStyle(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -231,11 +224,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                  const Icon(Icons.check_circle, size: 16, color: Color(AppColors.textMuted)),
                   const SizedBox(width: 8),
                   Text(
                     'Payé le: ${_formatDate(payment.paidDate!)}',
-                    style: const TextStyle(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -248,10 +241,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => _handlePayment(payment),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
                   child: const Text('Simuler le paiement'),
                 ),
               ),

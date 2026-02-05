@@ -18,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
+    _dashboardFuture = _dashboardService.getDashboardData();
   }
 
   void _loadDashboardData() {
@@ -37,15 +37,16 @@ class _HomeScreenState extends State<HomeScreen> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.orange,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(AppColors.border)),
             ),
             child: const Text(
-              'DÉMO',
+              'Démo',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(AppColors.textPrimary),
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -120,22 +121,22 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              // Current screen
-              break;
-            case 1:
-              Navigator.pushNamed(context, '/payments');
-              break;
-            case 2:
-              Navigator.pushNamed(context, '/maintenance');
-              break;
-            case 3:
-              Navigator.pushNamed(context, '/profile');
-              break;
-          }
-        },
+          onTap: (index) {
+            switch (index) {
+              case 0:
+                // Current screen
+                break;
+              case 1:
+                Navigator.pushReplacementNamed(context, '/payments');
+                break;
+              case 2:
+                Navigator.pushReplacementNamed(context, '/maintenance');
+                break;
+              case 3:
+                Navigator.pushReplacementNamed(context, '/profile');
+                break;
+            }
+          },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -166,16 +167,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Bienvenue,',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
+            Text('Bienvenue,', style: Theme.of(context).textTheme.bodySmall),
             Text(
               tenant.name,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
           ],
         ),
@@ -191,14 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Votre logement',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text('Votre logement', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.location_on, color: Colors.blue),
+                const Icon(Icons.location_on, color: Color(AppColors.textMuted)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -210,11 +202,11 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.euro, color: Colors.green),
+                const Icon(Icons.euro, color: Color(AppColors.textMuted)),
                 const SizedBox(width: 8),
                 Text(
                   'Loyer mensuel: ${property.monthlyRent.toStringAsFixed(2)} €',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -232,10 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Actions rapides',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text('Actions rapides', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -264,15 +253,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required VoidCallback onPressed,
   }) {
-    return ElevatedButton(
+    return OutlinedButton(
       onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 30),
+          Icon(icon, size: 22, color: const Color(AppColors.textPrimary)),
           const SizedBox(height: 8),
           Text(label),
         ],
@@ -288,13 +274,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Prochains paiements',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text('Prochains paiements', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             if (payments.isEmpty)
-              const Text('Aucun paiement à venir')
+              Text('Aucun paiement à venir', style: Theme.of(context).textTheme.bodySmall)
             else
               ...payments.map((payment) => _buildPaymentItem(payment)),
           ],
@@ -309,11 +292,9 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: payment.isPaid ? Colors.green.shade50 : Colors.orange.shade50,
+        color: const Color(AppColors.background),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: payment.isPaid ? Colors.green : Colors.orange,
-        ),
+        border: Border.all(color: const Color(AppColors.border)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -323,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 payment.month,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
                 '${payment.amount.toStringAsFixed(2)} €',
@@ -334,14 +315,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: payment.isPaid ? Colors.green : Colors.orange,
+              color: const Color(AppColors.surface),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(AppColors.border)),
             ),
             child: Text(
               payment.isPaid ? 'Payé' : 'À payer',
               style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+                color: Color(AppColors.textPrimary),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -357,24 +339,21 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Row(
           children: [
-            const Icon(Icons.build, size: 40, color: Colors.blue),
+            const Icon(Icons.build, size: 36, color: Color(AppColors.textMuted)),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Demandes de maintenance',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  Text('Demandes de maintenance', style: Theme.of(context).textTheme.titleMedium),
                   Text(
                     '$pendingCount demande(s) en attente',
-                    style: const TextStyle(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
-            ElevatedButton(
+            OutlinedButton(
               onPressed: () => Navigator.pushNamed(context, '/maintenance'),
               child: const Text('Voir tout'),
             ),

@@ -72,7 +72,6 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nouvelle Demande'),
-        centerTitle: true,
       ),
       body: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -81,12 +80,9 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Décrivez votre problème de maintenance',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 20),
 
@@ -96,7 +92,6 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Description détaillée',
                   hintText: 'Ex: Fuite d\'eau dans la cuisine, prise électrique défectueuse...',
-                  border: OutlineInputBorder(),
                   alignLabelWithHint: true,
                 ),
                 maxLines: 6,
@@ -116,24 +111,21 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
               Container(
                 padding: EdgeInsets.all(AppConstants.smallPadding),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: const Color(AppColors.surface),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: const Color(AppColors.border)),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Conseils pour une bonne description:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    SizedBox(height: 8),
-                    Text('• Soyez précis sur l\'emplacement'),
-                    Text('• Décrivez quand le problème est apparu'),
-                    Text('• Indiquez si c\'est urgent'),
+                    const SizedBox(height: 8),
+                    Text('• Soyez précis sur l\'emplacement', style: Theme.of(context).textTheme.bodySmall),
+                    Text('• Décrivez quand le problème est apparu', style: Theme.of(context).textTheme.bodySmall),
+                    Text('• Indiquez si c\'est urgent', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -142,15 +134,17 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
               // Submit button
               SizedBox(
                 width: double.infinity,
-                height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text(
                           'Envoyer la demande',
                           style: TextStyle(fontSize: 16),

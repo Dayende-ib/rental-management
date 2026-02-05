@@ -18,7 +18,7 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMaintenanceRequests();
+    _requestsFuture = _maintenanceService.getMaintenanceRequests();
   }
 
   void _loadMaintenanceRequests() {
@@ -32,7 +32,6 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Demandes'),
-        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -89,13 +88,13 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
           if (index != 2) { // Don't navigate if already on this screen
             switch (index) {
               case 0:
-                Navigator.pushNamed(context, '/home');
+                Navigator.pushReplacementNamed(context, '/home');
                 break;
               case 1:
-                Navigator.pushNamed(context, '/payments');
+                Navigator.pushReplacementNamed(context, '/payments');
                 break;
               case 3:
-                Navigator.pushNamed(context, '/profile');
+                Navigator.pushReplacementNamed(context, '/profile');
                 break;
             }
           }
@@ -131,21 +130,21 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
           const Icon(
             Icons.build,
             size: 80,
-            color: Colors.grey,
+            color: Color(AppColors.textMuted),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Aucune demande de maintenance',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Commencez par créer une nouvelle demande',
-            style: TextStyle(color: Colors.grey),
+            style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
+          OutlinedButton(
             onPressed: () {
               Navigator.pushNamed(context, '/create-maintenance');
             },
@@ -161,13 +160,13 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
     Color getStatusColor() {
       switch (request.status) {
         case 'pending':
-          return Colors.orange;
+          return const Color(AppColors.textMuted);
         case 'in_progress':
-          return Colors.blue;
+          return const Color(AppColors.textSecondary);
         case 'completed':
-          return Colors.green;
+          return const Color(AppColors.textPrimary);
         default:
-          return Colors.grey;
+          return const Color(AppColors.textMuted);
       }
     }
 
@@ -210,8 +209,9 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: getStatusColor(),
+                    color: const Color(AppColors.surface),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(AppColors.border)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -219,14 +219,14 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
                       Icon(
                         getStatusIcon(),
                         size: 16,
-                        color: Colors.white,
+                        color: getStatusColor(),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         request.statusDisplay,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                          color: Color(AppColors.textPrimary),
+                          fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
                       ),
@@ -240,11 +240,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
             // Creation date
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                const Icon(Icons.calendar_today, size: 16, color: Color(AppColors.textMuted)),
                 const SizedBox(width: 8),
                 Text(
                   'Créé le: ${_formatDateTime(request.createdAt)}',
-                  style: const TextStyle(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -254,11 +254,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.update, size: 16, color: Colors.grey),
+                  const Icon(Icons.update, size: 16, color: Color(AppColors.textMuted)),
                   const SizedBox(width: 8),
                   Text(
                     'Mis à jour: ${_formatDateTime(request.updatedAt!)}',
-                    style: const TextStyle(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),

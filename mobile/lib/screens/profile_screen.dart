@@ -18,7 +18,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTenantData();
+    _tenantFuture = Future.delayed(
+      const Duration(milliseconds: 500),
+      () => Tenant(
+        id: 'demo_user_123',
+        name: 'Jean Dupont',
+        email: 'jean.dupont@example.com',
+        phone: '+33 6 12 34 56 78',
+      ),
+    );
   }
 
   void _loadTenantData() {
@@ -69,7 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon Profil'),
-        centerTitle: true,
       ),
       body: FutureBuilder<Tenant?>(
         future: _tenantFuture,
@@ -130,13 +137,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (index != 3) { // Don't navigate if already on this screen
             switch (index) {
               case 0:
-                Navigator.pushNamed(context, '/home');
+                Navigator.pushReplacementNamed(context, '/home');
                 break;
               case 1:
-                Navigator.pushNamed(context, '/payments');
+                Navigator.pushReplacementNamed(context, '/payments');
                 break;
               case 2:
-                Navigator.pushNamed(context, '/maintenance');
+                Navigator.pushReplacementNamed(context, '/maintenance');
                 break;
             }
           }
@@ -172,28 +179,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const CircleAvatar(
               radius: 50,
-              backgroundColor: Colors.blue,
+              backgroundColor: Color(AppColors.surface),
               child: Icon(
                 Icons.person,
                 size: 50,
-                color: Colors.white,
+                color: Color(AppColors.textPrimary),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               tenant.name,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Locataire',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
@@ -209,25 +210,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Informations de contact',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
             
             // Email
             ListTile(
-              leading: const Icon(Icons.email, color: Colors.blue),
+              leading: const Icon(Icons.email, color: Color(AppColors.textMuted)),
               title: const Text('Email'),
               subtitle: Text(tenant.email),
             ),
             
             // Phone
             ListTile(
-              leading: const Icon(Icons.phone, color: Colors.green),
+              leading: const Icon(Icons.phone, color: Color(AppColors.textMuted)),
               title: const Text('Téléphone'),
               subtitle: Text(tenant.phone),
             ),
@@ -245,29 +243,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'À propos de l\'application',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
             
             ListTile(
-              leading: const Icon(Icons.info, color: Colors.grey),
+              leading: const Icon(Icons.info, color: Color(AppColors.textMuted)),
               title: const Text('Version'),
               subtitle: const Text('1.0.0'),
             ),
             
             ListTile(
-              leading: const Icon(Icons.security, color: Colors.grey),
+              leading: const Icon(Icons.security, color: Color(AppColors.textMuted)),
               title: const Text('Sécurité'),
               subtitle: const Text('Connexion sécurisée par JWT'),
             ),
             
             ListTile(
-              leading: const Icon(Icons.support, color: Colors.grey),
+              leading: const Icon(Icons.support, color: Color(AppColors.textMuted)),
               title: const Text('Support'),
               subtitle: const Text('contact@rental-management.com'),
             ),
@@ -281,12 +276,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLogoutButton() {
     return SizedBox(
       width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
+      child: OutlinedButton(
         onPressed: _handleLogout,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red,
+          side: const BorderSide(color: Colors.red),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
