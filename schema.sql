@@ -1,7 +1,7 @@
 -- Real Estate Management System Schema
 
 -- Profiles Table
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     full_name TEXT NOT NULL,
     role TEXT CHECK (role IN ('admin', 'manager', 'staff')) DEFAULT 'staff',
@@ -10,7 +10,7 @@ CREATE TABLE profiles (
 );
 
 -- Properties Table
-CREATE TABLE properties (
+CREATE TABLE IF NOT EXISTS properties (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE properties (
 );
 
 -- Tenants Table
-CREATE TABLE tenants (
+CREATE TABLE IF NOT EXISTS tenants (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     full_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE tenants (
 );
 
 -- Contracts Table
-CREATE TABLE contracts (
+CREATE TABLE IF NOT EXISTS contracts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     property_id UUID REFERENCES properties(id) ON DELETE CASCADE NOT NULL,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE contracts (
 );
 
 -- Payments Table
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     contract_id UUID REFERENCES contracts(id) ON DELETE CASCADE NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE payments (
 );
 
 -- Maintenance Table
-CREATE TABLE maintenance (
+CREATE TABLE IF NOT EXISTS maintenance (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     property_id UUID REFERENCES properties(id) ON DELETE CASCADE NOT NULL,
     description TEXT NOT NULL,
@@ -71,9 +71,9 @@ CREATE TABLE maintenance (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- RLS Policies
+-- RLS Policies Configuration
 
--- Enable RLS
+-- Enable RLS for all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
@@ -81,23 +81,24 @@ ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE maintenance ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Public can read basic info, owners can update their own
+-- Profiles Policies
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
--- Properties: Viewable by everyone, editable by authenticated users
+-- Properties Policies
 CREATE POLICY "Properties are viewable by everyone" ON properties FOR SELECT USING (true);
-CREATE POLICY "Properties are manageable by authenticated users" ON properties ALL USING (auth.role() = 'authenticated');
+-- CORRECTION: Utilisation de FOR ALL au lieu de ALL
+CREATE POLICY "Properties are manageable by authenticated users" ON properties FOR ALL TO authenticated USING (auth.role() = 'authenticated');
 
--- Tenants: Manageable by authenticated users
-CREATE POLICY "Tenants are manageable by authenticated users" ON tenants ALL USING (auth.role() = 'authenticated');
+-- Tenants Policies
+CREATE POLICY "Tenants are manageable by authenticated users" ON tenants FOR ALL TO authenticated USING (auth.role() = 'authenticated');
 
--- Contracts: Manageable by authenticated users
-CREATE POLICY "Contracts are manageable by authenticated users" ON contracts ALL USING (auth.role() = 'authenticated');
+-- Contracts Policies
+CREATE POLICY "Contracts are manageable by authenticated users" ON contracts FOR ALL TO authenticated USING (auth.role() = 'authenticated');
 
--- Payments: Manageable by authenticated users
-CREATE POLICY "Payments are manageable by authenticated users" ON payments ALL USING (auth.role() = 'authenticated');
+-- Payments Policies
+CREATE POLICY "Payments are manageable by authenticated users" ON payments FOR ALL TO authenticated USING (auth.role() = 'authenticated');
 
--- Maintenance: Manageable by authenticated users
-CREATE POLICY "Maintenance is manageable by authenticated users" ON maintenance ALL USING (auth.role() = 'authenticated');
+-- Maintenance Policies
+CREATE POLICY "Maintenance is manageable by authenticated users" ON maintenance FOR ALL TO authenticated USING (auth.role() = 'authenticated');
