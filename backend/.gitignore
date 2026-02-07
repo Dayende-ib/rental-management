@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Miscellaneous
 *.class
 *.lock
@@ -144,4 +143,5 @@ Thumbs.db
 dist/
 build/
 .cache/
->>>>>>> c540412 (feat: setup express server with supabase and swagger docs)
+backend/package-lock.json
+package-lock.json
