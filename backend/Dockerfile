@@ -4,7 +4,8 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+# Use npm ci when a lockfile exists, otherwise fall back to npm install
+RUN sh -c "if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi"
 
 # Copy source
 COPY . .

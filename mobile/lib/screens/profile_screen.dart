@@ -3,7 +3,7 @@ import '../auth/auth_service.dart';
 import '../core/models.dart';
 import '../core/constants.dart';
 
-/// Profile screen showing tenant information and logout option (DEMO MODE)
+/// Profile screen showing tenant information and logout option
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -18,25 +18,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _tenantFuture = _demoTenant();
-  }
-
-  Future<Tenant> _demoTenant() {
-    return Future.delayed(
-      const Duration(milliseconds: 500),
-      () => Tenant(
-        id: 'demo_user_123',
-        name: 'Jean Dupont',
-        email: 'jean.dupont@example.com',
-        phone: '+33 6 12 34 56 78',
-      ),
-    );
+    _tenantFuture = _authService.getCurrentTenant();
   }
 
   Future<void> _refreshTenantData() async {
     setState(() {
-      // DEMO MODE - Return fake tenant data
-      _tenantFuture = _demoTenant();
+      _tenantFuture = _authService.getCurrentTenant();
     });
     await _tenantFuture;
   }

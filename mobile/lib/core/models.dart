@@ -18,9 +18,9 @@ class Tenant {
   factory Tenant.fromJson(Map<String, dynamic> json) {
     return Tenant(
       id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
-      phone: json['phone'] as String,
+      name: (json['full_name'] ?? json['name'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      phone: (json['phone'] ?? '').toString(),
     );
   }
 
@@ -53,10 +53,12 @@ class Property {
   factory Property.fromJson(Map<String, dynamic> json) {
     return Property(
       id: json['id'] as String,
-      address: json['address'] as String,
-      city: json['city'] as String,
-      postalCode: json['postalCode'] as String,
-      monthlyRent: (json['monthlyRent'] as num).toDouble(),
+      address: (json['address'] ?? json['title'] ?? '').toString(),
+      city: (json['city'] ?? '').toString(),
+      postalCode: (json['postalCode'] ?? json['postal_code'] ?? '').toString(),
+      monthlyRent: _parseDouble(
+        json['monthlyRent'] ?? json['monthly_rent'] ?? json['price'],
+      ),
     );
   }
 }
@@ -82,16 +84,31 @@ class Payment {
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) {
+    final dueDate = _parseDate(
+          json['dueDate'] ??
+              json['due_date'] ??
+              json['payment_date'] ??
+              json['paymentDate'] ??
+              json['created_at'],
+        ) ??
+        DateTime.now();
+    final status = (json['status'] ?? 'pending').toString();
+    final paidDate = _parseDate(json['paidDate'] ?? json['paid_date']) ??
+        (status == 'paid' ? dueDate : null);
+    final month = (json['month'] ?? '').toString().isNotEmpty
+        ? json['month'].toString()
+        : _formatMonth(dueDate);
+    final validation =
+        (json['validationStatus'] ?? json['validation_status'])?.toString();
+
     return Payment(
       id: json['id'] as String,
-      month: json['month'] as String,
-      amount: (json['amount'] as num).toDouble(),
-      status: json['status'] as String,
-      dueDate: DateTime.parse(json['dueDate'] as String),
-      paidDate: json['paidDate'] != null 
-          ? DateTime.parse(json['paidDate'] as String) 
-          : null,
-      validationStatus: json['validationStatus'] as String? ?? 'validated',
+      month: month,
+      amount: _parseDouble(json['amount']),
+      status: status,
+      dueDate: dueDate,
+      paidDate: paidDate,
+      validationStatus: validation ?? _mapValidationFromStatus(status),
     );
   }
 
@@ -122,21 +139,30 @@ class MaintenanceRequest {
       id: json['id'] as String,
       description: json['description'] as String,
       status: json['status'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null 
-          ? DateTime.parse(json['updatedAt'] as String) 
-          : null,
+      createdAt: _parseDate(
+            json['createdAt'] ??
+                json['created_at'] ??
+                json['request_date'],
+          ) ??
+          DateTime.now(),
+      updatedAt: _parseDate(
+            json['updatedAt'] ??
+                json['updated_at'],
+          ),
     );
   }
 
   String get statusDisplay {
     switch (status) {
+      case 'reported':
       case 'pending':
         return 'En attente';
       case 'in_progress':
         return 'En cours';
       case 'completed':
-        return 'Terminé';
+        return 'Termine';
+      case 'cancelled':
+        return 'Annule';
       default:
         return status;
     }
@@ -157,3 +183,52 @@ class DashboardData {
     required this.pendingMaintenanceRequests,
   });
 }
+
+DateTime? _parseDate(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
+
+double _parseDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+String _formatMonth(DateTime date) {
+  const months = [
+    'Janvier',
+    'Fevrier',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Aout',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Decembre',
+  ];
+  final monthName = months[(date.month - 1).clamp(0, 11)];
+  return '$monthName ${date.year}';
+}
+
+String _mapValidationFromStatus(String status) {
+  switch (status) {
+    case 'paid':
+      return 'validated';
+    case 'pending':
+      return 'pending';
+    case 'failed':
+    case 'overdue':
+      return 'rejected';
+    default:
+      return 'not_submitted';
+  }
+}
+

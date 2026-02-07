@@ -1,11 +1,39 @@
+import 'package:flutter/foundation.dart';
+
 // Constants for the Rental Management Application
 class AppConstants {
   // API Configuration
-  static const String baseUrl = 'https://api.rental-management.com/api';
+  static const String _defaultAndroidBaseUrl = 'http://10.0.2.2:5000/api';
+  static const String _defaultIosBaseUrl = 'http://localhost:5000/api';
+  static const String _defaultWebBaseUrl = 'http://localhost:5000/api';
+  static const String _defaultOtherBaseUrl = 'http://localhost:5000/api';
+
+  static String get baseUrl {
+    const String envBaseUrl = String.fromEnvironment('API_BASE_URL');
+    if (envBaseUrl.isNotEmpty) {
+      return envBaseUrl;
+    }
+    if (kIsWeb) {
+      return _defaultWebBaseUrl;
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return _defaultAndroidBaseUrl;
+      case TargetPlatform.iOS:
+        return _defaultIosBaseUrl;
+      default:
+        return _defaultOtherBaseUrl;
+    }
+  }
+
   static const String loginEndpoint = '/auth/login';
+  static const String logoutEndpoint = '/auth/logout';
+  static const String profileEndpoint = '/auth/profile';
   static const String tenantProfileEndpoint = '/tenants/me';
   static const String paymentsEndpoint = '/payments';
   static const String maintenanceEndpoint = '/maintenance';
+  static const String propertiesEndpoint = '/properties';
+  static const String contractsEndpoint = '/contracts';
   
   // Storage Keys
   static const String tokenKey = 'jwt_token';

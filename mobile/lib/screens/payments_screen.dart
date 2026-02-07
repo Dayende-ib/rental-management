@@ -18,6 +18,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   late Future<List<Payment>> _paymentsFuture;
   final ImagePicker _picker = ImagePicker();
   final Map<String, String?> _proofs = {};
+  final Map<String, String?> _proofMimeTypes = {};
 
   @override
   void initState() {
@@ -36,22 +37,34 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     await _paymentsFuture;
   }
 
-  Future<String?> _pickProofBase64() async {
+  Future<Map<String, String>?> _pickProof() async {
     final XFile? file = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 75,
     );
     if (file == null) return null;
     final bytes = await file.readAsBytes();
-    return base64Encode(bytes);
+    return {
+      'base64': base64Encode(bytes),
+      'mimeType': _inferMimeType(file.path),
+    };
+  }
+
+  String _inferMimeType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return 'image/jpeg';
   }
 
   void _removeProof(String paymentId) {
     setState(() {
       _proofs.remove(paymentId);
+      _proofMimeTypes.remove(paymentId);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Preuve supprim√©e')),
+      const SnackBar(content: Text('Preuve supprimÈe')),
     );
   }
 
@@ -75,14 +88,15 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   Future<void> _attachProof(String paymentId) async {
-    final proof = await _pickProofBase64();
+    final proof = await _pickProof();
     if (!mounted) return;
     setState(() {
-      _proofs[paymentId] = proof;
+      _proofs[paymentId] = proof?['base64'];
+      _proofMimeTypes[paymentId] = proof?['mimeType'];
     });
     if (proof != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preuve ajout√©e')),
+        const SnackBar(content: Text('Preuve ajoutÈe')),
       );
     }
   }
@@ -96,7 +110,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Confirmer le paiement'),
         content: Text(
-          'Confirmez-vous le paiement de ${payment.amount.toStringAsFixed(2)} ‚Ç¨ '
+          'Confirmez-vous le paiement de ${payment.amount.toStringAsFixed(2)} Ä '
           'pour ${payment.month} ?\n\nVous pouvez joindre une preuve (photo). Le bailleur devra valider.',
         ),
         actions: [
@@ -114,16 +128,21 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
     if (confirmed == true) {
       if (!mounted) return;
-      final proof = _proofs[payment.id]; // n'ouvre pas le picker si aucune preuve (optionnel)
-      final success = await _paymentService.makePayment(payment.id, proofBase64: proof);
+      final proof = _proofs[payment.id];
+      final proofMimeType = _proofMimeTypes[payment.id];
+      final success = await _paymentService.makePayment(
+        payment.id,
+        proofBase64: proof,
+        proofMimeType: proofMimeType,
+      );
       if (!mounted) return;
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               proof == null
-                  ? 'Paiement envoy√© pour validation (sans preuve)'
-                  : 'Paiement envoy√© avec preuve pour validation',
+                  ? 'Paiement envoyÈ pour validation (sans preuve)'
+                  : 'Paiement envoyÈ avec preuve pour validation',
             ),
           ),
         );
@@ -163,7 +182,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _loadPayments,
-                    child: const Text('R√©essayer'),
+                    child: const Text('RÈessayer'),
                   ),
                 ],
               ),
@@ -238,7 +257,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     if (isPaid) {
       badgeColor = const Color(AppColors.accentLight);
       badgeTextColor = const Color(AppColors.accent);
-      badgeText = 'Valid√©';
+      badgeText = 'ValidÈ';
     } else if (isPendingValidation) {
       badgeColor = Colors.orange.shade100;
       badgeTextColor = Colors.orange.shade800;
@@ -246,11 +265,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     } else if (isRejected) {
       badgeColor = Colors.red.shade100;
       badgeTextColor = Colors.red.shade800;
-      badgeText = 'Non valid√©';
+      badgeText = 'Non validÈ';
     } else {
       badgeColor = const Color(AppColors.surface);
       badgeTextColor = const Color(AppColors.textPrimary);
-      badgeText = '√Ä payer';
+      badgeText = '¿ payer';
     }
 
     return Card(
@@ -276,7 +295,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '√âch√©ance: ${_formatDate(payment.dueDate)}',
+                      '…chÈance: ${_formatDate(payment.dueDate)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -316,7 +335,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   const Icon(Icons.check_circle, size: 16, color: Color(AppColors.accentSoft)),
                   const SizedBox(width: 8),
                   Text(
-                    'Pay√© le: ${_formatDate(payment.paidDate!)}',
+                    'PayÈ le: ${_formatDate(payment.paidDate!)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -330,7 +349,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Le bailleur a refus√© ce paiement. Merci de renvoyer une preuve ou de re-soumettre.',
+                      'Le bailleur a refusÈ ce paiement. Merci de renvoyer une preuve ou de re-soumettre.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -361,7 +380,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _proofs[payment.id] != null ? 'Preuve envoy√©e' : 'Preuve optionnelle',
+                      _proofs[payment.id] != null ? 'Preuve envoyÈe' : 'Preuve optionnelle',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.black87,
                             fontWeight: _proofs[payment.id] != null
@@ -421,12 +440,12 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     : null,
                 child: Text(
                   isPaid
-                      ? 'D√©j√† valid√©'
+                      ? 'DÈj‡ validÈ'
                       : isPendingValidation
                           ? 'Validation en cours'
                           : isRejected
                               ? 'Renvoyer le paiement'
-                              : 'Payer / Marquer pay√©',
+                              : 'Payer / Marquer payÈ',
                 ),
               ),
             ),

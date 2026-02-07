@@ -114,15 +114,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Mode démo — aucun backend requis',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
                     const SizedBox(height: 28),
 
                     // Card container
@@ -209,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: _isLoading ? null : _fillDemoCredentials,
-                              child: const Text('Remplir identifiants démo'),
+                              child: const Text('Remplir identifiants test'),
                             ),
                           ),
                         ],
@@ -225,3 +216,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

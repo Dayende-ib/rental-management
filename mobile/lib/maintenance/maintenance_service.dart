@@ -1,47 +1,25 @@
 import '../core/api_client.dart';
+import '../core/constants.dart';
 import '../core/models.dart';
 
-/// Service for handling maintenance request API calls (DEMO MODE)
+/// Service for handling maintenance request API calls
 class MaintenanceService {
   final ApiClient _apiClient = ApiClient();
 
-  /// Get all maintenance requests for the current tenant (DEMO MODE)
+  /// Get all maintenance requests for the current tenant
   Future<List<MaintenanceRequest>> getMaintenanceRequests() async {
     try {
-      // DEMO MODE - Return fake data
-      await Future.delayed(const Duration(milliseconds: 700)); // Simulate network delay
-      
-      final requests = [
-        MaintenanceRequest(
-          id: 'maint_001',
-          description: 'Fuite d\'eau sous l\'évier de la cuisine',
-          status: 'pending',
-          createdAt: DateTime(2024, 1, 15, 10, 30),
-        ),
-        MaintenanceRequest(
-          id: 'maint_002',
-          description: 'Prise électrique défectueuse dans le salon',
-          status: 'in_progress',
-          createdAt: DateTime(2024, 1, 10, 9, 15),
-          updatedAt: DateTime(2024, 1, 16, 14, 20),
-        ),
-        MaintenanceRequest(
-          id: 'maint_003',
-          description: 'Remplacement de l\'ampoule grillée dans la chambre',
-          status: 'completed',
-          createdAt: DateTime(2024, 1, 5, 16, 45),
-          updatedAt: DateTime(2024, 1, 8, 11, 30),
-        ),
-        MaintenanceRequest(
-          id: 'maint_004',
-          description: 'Nettoyage des gouttières',
-          status: 'completed',
-          createdAt: DateTime(2023, 12, 20, 14, 15),
-          updatedAt: DateTime(2023, 12, 22, 9, 0),
-        ),
-      ];
-      
-      // Sort by creation date (newest first)
+      final propertyId = await _resolvePropertyId();
+      final data = await _apiClient.getList(AppConstants.maintenanceEndpoint);
+      final requests = <MaintenanceRequest>[];
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          if (propertyId == null || propertyId.isEmpty ||
+              item['property_id']?.toString() == propertyId) {
+            requests.add(MaintenanceRequest.fromJson(item));
+          }
+        }
+      }
       requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return requests;
     } catch (e) {
@@ -49,15 +27,48 @@ class MaintenanceService {
     }
   }
 
-  /// Create a new maintenance request (DEMO MODE)
+  /// Create a new maintenance request
   Future<bool> createMaintenanceRequest(String description) async {
     try {
-      // DEMO MODE - Always succeed after delay
-      await Future.delayed(const Duration(milliseconds: 1200));
+      final propertyId = await _resolvePropertyId();
+      if (propertyId == null || propertyId.isEmpty) {
+        throw Exception('Aucune propriete disponible');
+      }
+
+      await _apiClient.post(
+        AppConstants.maintenanceEndpoint,
+        body: {
+          'property_id': propertyId,
+          'description': description,
+        },
+      );
       return true;
     } catch (e) {
       print('Maintenance request error: $e');
       return false;
     }
+  }
+
+  Future<String?> _resolvePropertyId() async {
+    try {
+      final tenant = await _apiClient.get(AppConstants.tenantProfileEndpoint);
+      final tenantId = tenant['id']?.toString();
+      if (tenantId != null && tenantId.isNotEmpty) {
+        final contracts =
+            await _apiClient.getList(AppConstants.contractsEndpoint);
+        for (final item in contracts) {
+          if (item is Map<String, dynamic> &&
+              item['tenant_id']?.toString() == tenantId) {
+            return item['property_id']?.toString();
+          }
+        }
+      }
+    } catch (_) {}
+
+    final properties = await _apiClient.getList(AppConstants.propertiesEndpoint);
+    if (properties.isNotEmpty && properties.first is Map<String, dynamic>) {
+      return (properties.first as Map<String, dynamic>)['id']?.toString();
+    }
+    return null;
   }
 }

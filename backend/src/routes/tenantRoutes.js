@@ -32,6 +32,22 @@ router.get('/', authMiddleware, tenantController.getTenants);
 
 /**
  * @swagger
+ * /api/tenants/me:
+ *   get:
+ *     summary: Get current tenant profile
+ *     tags: [Tenants]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current tenant profile
+ *       404:
+ *         description: Tenant not found
+ */
+router.get('/me', authMiddleware, tenantController.getCurrentTenant);
+
+/**
+ * @swagger
  * /api/tenants/{id}:
  *   get:
  *     summary: Get tenant by ID

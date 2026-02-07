@@ -1,85 +1,81 @@
 import '../core/api_client.dart';
+import '../core/constants.dart';
 import '../core/models.dart';
 
-/// Service for handling payment-related API calls (DEMO MODE)
+/// Service for handling payment-related API calls
 class PaymentService {
   final ApiClient _apiClient = ApiClient();
-  List<Payment>? _cache;
 
-  /// Get all payments for the current tenant (DEMO MODE)
+  /// Get all payments for the current tenant
   Future<List<Payment>> getPayments() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 400));
-
-      _cache ??= [
-        Payment(
-          id: 'pay_001',
-          month: 'Janvier 2024',
-          amount: 450000.00,
-          status: 'paid',
-          dueDate: DateTime(2024, 1, 5),
-          paidDate: DateTime(2024, 1, 3),
-          validationStatus: 'validated',
-        ),
-        Payment(
-          id: 'pay_002',
-          month: 'Février 2024',
-          amount: 450000.00,
-          status: 'unpaid',
-          dueDate: DateTime(2024, 2, 5),
-          validationStatus: 'pending',
-        ),
-        Payment(
-          id: 'pay_003',
-          month: 'Mars 2024',
-          amount: 450000.00,
-          status: 'unpaid',
-          dueDate: DateTime(2024, 3, 5),
-          validationStatus: 'not_submitted',
-        ),
-        Payment(
-          id: 'pay_004',
-          month: 'Avril 2024',
-          amount: 450000.00,
-          status: 'unpaid',
-          dueDate: DateTime(2024, 4, 5),
-          validationStatus: 'rejected',
-        ),
-      ];
-
-      _cache!.sort((a, b) => b.dueDate.compareTo(a.dueDate));
-      return List<Payment>.from(_cache!);
+      final contractIds = await _resolveContractIds();
+      final data = await _apiClient.getList(AppConstants.paymentsEndpoint);
+      final payments = <Payment>[];
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          if (contractIds.isEmpty ||
+              contractIds.contains(item['contract_id']?.toString())) {
+            payments.add(Payment.fromJson(item));
+          }
+        }
+      }
+      payments.sort((a, b) => b.dueDate.compareTo(a.dueDate));
+      return payments;
     } catch (e) {
       throw Exception('Failed to load payments: $e');
     }
   }
 
-  /// Simulate payment for a specific payment (DEMO MODE)
-  Future<bool> makePayment(String paymentId, {String? proofBase64}) async {
+  /// Submit payment proof or mark payment as pending
+  Future<bool> makePayment(
+    String paymentId, {
+    String? proofBase64,
+    String? proofMimeType,
+  }) async {
     try {
-      await Future.delayed(const Duration(milliseconds: 800));
-      _cache = _cache?.map((p) {
-        if (p.id == paymentId) {
-          return Payment(
-            id: p.id,
-            month: p.month,
-            amount: p.amount,
-            status: p.status,
-            dueDate: p.dueDate,
-            paidDate: DateTime.now(),
-            validationStatus: 'pending',
-          );
-        }
-        return p;
-      }).toList();
-      // DEMO: send to API (commented)
-      // await _apiClient.post('/payments/$paymentId/proof', body: {
-      //   'proof': proofBase64,
-      // });
+      await _apiClient.put(
+        '${AppConstants.paymentsEndpoint}/$paymentId',
+        body: {
+          'status': 'pending',
+          'payment_date': DateTime.now().toIso8601String().split('T').first,
+        },
+      );
+
+      if (proofBase64 != null && proofBase64.isNotEmpty) {
+        await _apiClient.post(
+          '${AppConstants.paymentsEndpoint}/$paymentId/proof',
+          body: {
+            'imageBase64': proofBase64,
+            'mimeType': proofMimeType ?? 'image/jpeg',
+          },
+        );
+      }
       return true;
     } catch (e) {
       print('Payment error: $e');
       return false;
+    }
+  }
+
+  Future<Set<String>> _resolveContractIds() async {
+    try {
+      final tenant = await _apiClient.get(AppConstants.tenantProfileEndpoint);
+      final tenantId = tenant['id']?.toString();
+      if (tenantId == null || tenantId.isEmpty) return {};
+
+      final contracts = await _apiClient.getList(AppConstants.contractsEndpoint);
+      final ids = <String>{};
+      for (final item in contracts) {
+        if (item is Map<String, dynamic> &&
+            item['tenant_id']?.toString() == tenantId &&
+            item['id'] != null) {
+          ids.add(item['id'].toString());
+        }
+      }
+      return ids;
+    } catch (_) {
+      return {};
     }
   }
 }

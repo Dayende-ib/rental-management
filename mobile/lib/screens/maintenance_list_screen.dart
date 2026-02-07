@@ -170,12 +170,15 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
   Widget _buildMaintenanceCard(MaintenanceRequest request) {
     Color getStatusColor() {
       switch (request.status) {
+        case 'reported':
         case 'pending':
           return Colors.orange.shade100;
         case 'in_progress':
           return Colors.blue.shade100;
         case 'completed':
           return Colors.green.shade100;
+        case 'cancelled':
+          return Colors.red.shade100;
         default:
           return const Color(AppColors.textMuted);
       }
@@ -183,12 +186,15 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
 
     IconData getStatusIcon() {
       switch (request.status) {
+        case 'reported':
         case 'pending':
           return Icons.access_time;
         case 'in_progress':
           return Icons.build;
         case 'completed':
           return Icons.check_circle;
+        case 'cancelled':
+          return Icons.cancel;
         default:
           return Icons.help;
       }
