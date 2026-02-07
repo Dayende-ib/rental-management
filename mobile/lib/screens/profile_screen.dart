@@ -18,7 +18,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _tenantFuture = Future.delayed(
+    _tenantFuture = _demoTenant();
+  }
+
+  Future<Tenant> _demoTenant() {
+    return Future.delayed(
       const Duration(milliseconds: 500),
       () => Tenant(
         id: 'demo_user_123',
@@ -29,19 +33,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _loadTenantData() {
+  Future<void> _refreshTenantData() async {
     setState(() {
       // DEMO MODE - Return fake tenant data
-      _tenantFuture = Future.delayed(
-        const Duration(milliseconds: 500),
-        () => Tenant(
-          id: 'demo_user_123',
-          name: 'Jean Dupont',
-          email: 'jean.dupont@example.com',
-          phone: '+33 6 12 34 56 78',
-        ),
-      );
+      _tenantFuture = _demoTenant();
     });
+    await _tenantFuture;
   }
 
   /// Handle logout
@@ -67,6 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed == true) {
       await _authService.logout();
+      if (!mounted) return;
       // Navigate to login screen and remove all previous routes
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
@@ -95,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text('Erreur: ${snapshot.error}'),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _loadTenantData,
+                    onPressed: _refreshTenantData,
                     child: const Text('Réessayer'),
                   ),
                 ],
@@ -105,27 +103,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           final tenant = snapshot.data!;
           return RefreshIndicator(
-            onRefresh: () async => _loadTenantData(),
-            child: SingleChildScrollView(
+            onRefresh: _refreshTenantData,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(AppConstants.defaultPadding),
-              child: Column(
-                children: [
-                  // Profile header
-                  _buildProfileHeader(tenant),
-                  const SizedBox(height: 30),
+              children: [
+                // Profile header
+                _buildProfileHeader(tenant),
+                const SizedBox(height: 30),
 
-                  // Contact information
-                  _buildContactInfo(tenant),
-                  const SizedBox(height: 30),
+                // Contact information
+                _buildContactInfo(tenant),
+                const SizedBox(height: 30),
 
-                  // App information
-                  _buildAppInfo(),
-                  const SizedBox(height: 30),
+                // App information
+                _buildAppInfo(),
+                const SizedBox(height: 30),
 
-                  // Logout button
-                  _buildLogoutButton(),
-                ],
-              ),
+                // Logout button
+                _buildLogoutButton(),
+              ],
             ),
           );
         },
@@ -183,7 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Icon(
                 Icons.person,
                 size: 50,
-                color: Color(AppColors.textPrimary),
+                color: Color(AppColors.accent),
               ),
             ),
             const SizedBox(height: 16),
@@ -218,14 +215,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             
             // Email
             ListTile(
-              leading: const Icon(Icons.email, color: Color(AppColors.textMuted)),
+              leading: const Icon(Icons.email, color: Color(AppColors.accent)),
               title: const Text('Email'),
               subtitle: Text(tenant.email),
             ),
             
             // Phone
             ListTile(
-              leading: const Icon(Icons.phone, color: Color(AppColors.textMuted)),
+              leading: const Icon(Icons.phone, color: Color(AppColors.accentSoft)),
               title: const Text('Téléphone'),
               subtitle: Text(tenant.phone),
             ),
@@ -250,19 +247,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
             
             ListTile(
-              leading: const Icon(Icons.info, color: Color(AppColors.textMuted)),
+              leading: const Icon(Icons.info, color: Color(AppColors.accent)),
               title: const Text('Version'),
               subtitle: const Text('1.0.0'),
             ),
             
             ListTile(
-              leading: const Icon(Icons.security, color: Color(AppColors.textMuted)),
+              leading: const Icon(Icons.security, color: Color(AppColors.accentSoft)),
               title: const Text('Sécurité'),
               subtitle: const Text('Connexion sécurisée par JWT'),
             ),
             
             ListTile(
-              leading: const Icon(Icons.support, color: Color(AppColors.textMuted)),
+              leading: const Icon(Icons.support, color: Color(AppColors.accent)),
               title: const Text('Support'),
               subtitle: const Text('contact@rental-management.com'),
             ),

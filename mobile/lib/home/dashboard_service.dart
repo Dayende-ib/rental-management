@@ -13,17 +13,17 @@ class DashboardService {
       
       final tenant = Tenant(
         id: 'demo_user_123',
-        name: 'Jean Dupont',
-        email: 'jean.dupont@example.com',
-        phone: '+33 6 12 34 56 78',
+        name: 'Awa Sawadogo',
+        email: 'awa.sawadogo@example.com',
+        phone: '+226 70 12 34 56',
       );
       
       final property = Property(
         id: 'prop_456',
-        address: '123 Rue de la Paix',
-        city: 'Paris',
-        postalCode: '75001',
-        monthlyRent: 1200.00,
+        address: '01 BP 1234, Quartier Koulouba',
+        city: 'Ouagadougou',
+        postalCode: 'BF-1100',
+        monthlyRent: 450000.00, // FCFA
       );
       
       final payments = [

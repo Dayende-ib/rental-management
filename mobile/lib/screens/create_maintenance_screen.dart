@@ -120,7 +120,9 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
                   children: [
                     Text(
                       'Conseils pour une bonne description:',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: const Color(AppColors.accent),
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text('• Soyez précis sur l\'emplacement', style: Theme.of(context).textTheme.bodySmall),

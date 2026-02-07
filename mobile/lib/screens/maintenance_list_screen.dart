@@ -26,6 +26,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
       _requestsFuture = _maintenanceService.getMaintenanceRequests();
     });
   }
+ 
+  Future<void> _refreshMaintenanceRequests() async {
+    _loadMaintenanceRequests();
+    await _requestsFuture;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,10 +73,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
 
           final requests = snapshot.data!;
           return RefreshIndicator(
-            onRefresh: () async => _loadMaintenanceRequests(),
+            onRefresh: _refreshMaintenanceRequests,
             child: requests.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.all(AppConstants.defaultPadding),
                     itemCount: requests.length,
                     itemBuilder: (context, index) {
@@ -80,6 +86,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
                   ),
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, '/create-maintenance'),
+        icon: const Icon(Icons.add),
+        label: const Text('Nouvelle demande'),
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -160,11 +171,11 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
     Color getStatusColor() {
       switch (request.status) {
         case 'pending':
-          return const Color(AppColors.textMuted);
+          return Colors.orange.shade100;
         case 'in_progress':
-          return const Color(AppColors.textSecondary);
+          return Colors.blue.shade100;
         case 'completed':
-          return const Color(AppColors.textPrimary);
+          return Colors.green.shade100;
         default:
           return const Color(AppColors.textMuted);
       }
@@ -185,49 +196,48 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+      ),
+      elevation: 2,
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with status
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(
-                    request.description,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Container(
+                  height: 36,
+                  width: 36,
+                  decoration: BoxDecoration(
+                    color: getStatusColor(),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    getStatusIcon(),
+                    color: Colors.black54,
+                    size: 18,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(AppColors.surface),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(AppColors.border)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        getStatusIcon(),
-                        size: 16,
-                        color: getStatusColor(),
+                      Text(
+                        request.description,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(height: 4),
                       Text(
                         request.statusDisplay,
-                        style: const TextStyle(
-                          color: Color(AppColors.textPrimary),
+                        style: TextStyle(
+                          color: Colors.black54,
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -236,29 +246,25 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // Creation date
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Color(AppColors.textMuted)),
+                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                 const SizedBox(width: 8),
                 Text(
                   'Créé le: ${_formatDateTime(request.createdAt)}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),
-
-            // Updated date (if applicable)
             if (request.updatedAt != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.update, size: 16, color: Color(AppColors.textMuted)),
+                  const Icon(Icons.update, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
                     'Mis à jour: ${_formatDateTime(request.updatedAt!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: const TextStyle(color: Colors.grey),
                   ),
                 ],
               ),

@@ -7,6 +7,7 @@ import 'screens/maintenance_list_screen.dart';
 import 'screens/create_maintenance_screen.dart';
 import 'screens/profile_screen.dart';
 import 'core/constants.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Main application widget with routing configuration
 class RentalApp extends StatefulWidget {
@@ -21,6 +22,28 @@ class _RentalAppState extends State<RentalApp> {
 
   @override
   Widget build(BuildContext context) {
+    final baseTextTheme = GoogleFonts.poppinsTextTheme();
+    final textTheme = baseTextTheme.copyWith(
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: const Color(AppColors.textPrimary),
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: const Color(AppColors.textPrimary),
+      ),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        fontSize: 14,
+        color: const Color(AppColors.textSecondary),
+      ),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(
+        fontSize: 12,
+        color: const Color(AppColors.textMuted),
+      ),
+    );
+
     return MaterialApp(
       title: 'Rental Management',
       theme: ThemeData(
@@ -28,40 +51,21 @@ class _RentalAppState extends State<RentalApp> {
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(AppColors.accent),
           brightness: Brightness.light,
-          background: const Color(AppColors.background),
           surface: const Color(AppColors.surface),
         ),
         scaffoldBackgroundColor: const Color(AppColors.background),
-        textTheme: const TextTheme(
-          headlineSmall: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: Color(AppColors.textPrimary),
-          ),
-          titleMedium: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(AppColors.textPrimary),
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 14,
-            color: Color(AppColors.textSecondary),
-          ),
-          bodySmall: TextStyle(
-            fontSize: 12,
-            color: Color(AppColors.textMuted),
-          ),
-        ),
+        textTheme: textTheme,
         appBarTheme: const AppBarTheme(
           centerTitle: true,
           elevation: 0,
           backgroundColor: Color(AppColors.background),
-          foregroundColor: Color(AppColors.textPrimary),
+          foregroundColor: Color(AppColors.accent),
           surfaceTintColor: Colors.transparent,
         ),
         cardTheme: CardThemeData(
           color: const Color(AppColors.surface),
-          elevation: 0,
+          elevation: 4,
+          shadowColor: const Color(0x1A000000), // légère ombre diffuse
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.cardRadius),
             side: const BorderSide(color: Color(AppColors.border)),
@@ -84,7 +88,7 @@ class _RentalAppState extends State<RentalApp> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppConstants.inputRadius),
-            borderSide: const BorderSide(color: Color(AppColors.textPrimary)),
+            borderSide: const BorderSide(color: Color(AppColors.accent)),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -95,22 +99,22 @@ class _RentalAppState extends State<RentalApp> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.inputRadius),
             ),
-            minimumSize: const Size.fromHeight(AppConstants.buttonHeight),
+            minimumSize: const Size(0, AppConstants.buttonHeight),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(AppColors.textPrimary),
-            side: const BorderSide(color: Color(AppColors.border)),
+            foregroundColor: const Color(AppColors.accent),
+            side: const BorderSide(color: Color(AppColors.accent)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.inputRadius),
             ),
-            minimumSize: const Size.fromHeight(AppConstants.buttonHeight),
+            minimumSize: const Size(0, AppConstants.buttonHeight),
           ),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Color(AppColors.background),
-          selectedItemColor: Color(AppColors.textPrimary),
+          selectedItemColor: Color(AppColors.accent),
           unselectedItemColor: Color(AppColors.textMuted),
           showUnselectedLabels: true,
           elevation: 0,

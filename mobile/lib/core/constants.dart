@@ -25,19 +25,28 @@ class AppConstants {
 }
 
 class AppColors {
-  static const int _black = 0xFF0E0E0E;
+  static const int _emerald = 0xFF0F795C; // primaire
+  static const int _emeraldSoft = 0xFF2FA67D;
+  static const int _emeraldLight = 0xFF6BD3B1;
+  static const int _background = 0xFFF5F7FA; // gris clair / beige
   static const int _white = 0xFFFFFFFF;
-  static const int _gray50 = 0xFFF7F7F7;
-  static const int _gray100 = 0xFFF0F0F0;
-  static const int _gray200 = 0xFFE4E4E4;
-  static const int _gray500 = 0xFF8A8A8A;
-  static const int _gray700 = 0xFF4A4A4A;
+  static const int _black = 0xFF1F1F1F;
+  static const int _gray500 = 0xFF8E95A3;
+  static const int _gray300 = 0xFFDCE2EA;
 
-  static const int background = _white;
-  static const int surface = _gray50;
-  static const int border = _gray200;
+  static const int background = _background;
+  static const int surface = _white;
+  static const int border = _gray300;
   static const int textPrimary = _black;
-  static const int textSecondary = _gray700;
+  static const int textSecondary = _gray500;
   static const int textMuted = _gray500;
-  static const int accent = _black;
+  static const int accent = _emerald;
+  static const int accentSoft = _emeraldSoft;
+  static const int accentLight = _emeraldLight;
+
+  static const List<int> gradient = [
+    _emerald,
+    _emeraldSoft,
+    _emeraldLight,
+  ];
 }

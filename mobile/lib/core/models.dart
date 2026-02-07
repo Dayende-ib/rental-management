@@ -69,6 +69,7 @@ class Payment {
   final String status; // 'paid' or 'unpaid'
   final DateTime dueDate;
   final DateTime? paidDate;
+  final String validationStatus; // 'not_submitted', 'pending', 'validated', 'rejected'
 
   Payment({
     required this.id,
@@ -77,6 +78,7 @@ class Payment {
     required this.status,
     required this.dueDate,
     this.paidDate,
+    this.validationStatus = 'validated',
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) {
@@ -89,10 +91,14 @@ class Payment {
       paidDate: json['paidDate'] != null 
           ? DateTime.parse(json['paidDate'] as String) 
           : null,
+      validationStatus: json['validationStatus'] as String? ?? 'validated',
     );
   }
 
   bool get isPaid => status == 'paid';
+  bool get isPendingValidation => validationStatus == 'pending';
+  bool get isRejected => validationStatus == 'rejected';
+  bool get isValidated => validationStatus == 'validated';
 }
 
 /// Maintenance request model
