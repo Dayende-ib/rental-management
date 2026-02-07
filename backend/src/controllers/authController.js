@@ -19,13 +19,27 @@ const supabase = require('../config/supabase');
 const register = async (req, res, next) => {
     try {
         const { email, password, full_name, role } = req.body;
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+            return res.status(400).json({ error: 'Invalid email address' });
+        }
+        if (!password || String(password).length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+        if (!full_name || String(full_name).trim().length < 3) {
+            return res.status(400).json({ error: 'Full name is required' });
+        }
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password,
+            email: normalizedEmail,
+            password: String(password),
         });
 
-        if (authError) throw authError;
+        if (authError) {
+            authError.status = authError.status || 400;
+            throw authError;
+        }
 
         if (authData.user) {
             const { error: profileError } = await supabase
@@ -53,12 +67,23 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+            return res.status(400).json({ error: 'Invalid email address' });
+        }
+        if (!password) {
+            return res.status(400).json({ error: 'Password is required' });
+        }
         const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
+            email: normalizedEmail,
+            password: String(password),
         });
 
-        if (error) throw error;
+        if (error) {
+            error.status = error.status || 401;
+            throw error;
+        }
         res.status(200).json(data);
     } catch (err) {
         next(err);
@@ -112,3 +137,14 @@ module.exports = {
     getProfile,
     updateProfile,
 };
+
+function normalizeEmail(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '');
+}
+
+function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}

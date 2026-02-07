@@ -27,6 +27,7 @@ class AppConstants {
   }
 
   static const String loginEndpoint = '/auth/login';
+  static const String registerEndpoint = '/auth/register';
   static const String logoutEndpoint = '/auth/logout';
   static const String profileEndpoint = '/auth/profile';
   static const String tenantProfileEndpoint = '/tenants/me';

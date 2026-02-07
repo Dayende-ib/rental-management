@@ -11,10 +11,11 @@ class AuthService {
   /// Returns true if login successful, false otherwise
   Future<bool> login(String email, String password) async {
     try {
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await _apiClient.post(
         AppConstants.loginEndpoint,
         body: {
-          'email': email,
+          'email': normalizedEmail,
           'password': password,
         },
         requiresAuth: false,
@@ -33,6 +34,35 @@ class AuthService {
       return true;
     } catch (e) {
       print('Login error: $e');
+      return false;
+    }
+  }
+
+  /// Register a new user
+  Future<bool> register(String fullName, String email, String password) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      final response = await _apiClient.post(
+        AppConstants.registerEndpoint,
+        body: {
+          'email': normalizedEmail,
+          'password': password,
+          'full_name': fullName,
+          'role': 'staff',
+        },
+        requiresAuth: false,
+      );
+      final token = _extractToken(response);
+      if (token != null && token.isNotEmpty) {
+        await StorageService.saveToken(token);
+        final userId = _extractUserId(response);
+        if (userId != null && userId.isNotEmpty) {
+          await StorageService.saveUserId(userId);
+        }
+      }
+      return true;
+    } catch (e) {
+      print('Register error: $e');
       return false;
     }
   }

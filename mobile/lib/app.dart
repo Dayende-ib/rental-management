@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'auth/auth_service.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/payments_screen.dart';
-import 'screens/maintenance_list_screen.dart';
-import 'screens/create_maintenance_screen.dart';
-import 'screens/profile_screen.dart';
-import 'core/constants.dart';
+import 'package:rental_management/auth/auth_service.dart';
+import 'package:rental_management/screens/login_screen.dart';
+import 'package:rental_management/screens/home_screen.dart';
+import 'package:rental_management/screens/payments_screen.dart';
+import 'package:rental_management/screens/maintenance_list_screen.dart';
+import 'package:rental_management/screens/create_maintenance_screen.dart';
+import 'package:rental_management/screens/profile_screen.dart';
+import 'package:rental_management/screens/register_screen.dart';
+import 'package:rental_management/screens/guest_properties_screen.dart';
+import 'package:rental_management/core/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Main application widget with routing configuration
@@ -19,6 +21,45 @@ class RentalApp extends StatefulWidget {
 
 class _RentalAppState extends State<RentalApp> {
   final AuthService _authService = AuthService();
+  final Set<String> _publicRoutes = const {
+    '/login',
+    '/register',
+    '/guest-properties',
+  };
+
+  Route<dynamic> _onGenerateRoute(RouteSettings settings) {
+    final name = settings.name ?? '/';
+    final isAuthed = _authService.isAuthenticated();
+    final isPublic = _publicRoutes.contains(name);
+
+    if (!isAuthed && !isPublic) {
+      return MaterialPageRoute(
+        builder: (_) => const LoginScreen(),
+        settings: const RouteSettings(name: '/login'),
+      );
+    }
+
+    switch (name) {
+      case '/login':
+        return MaterialPageRoute(builder: (_) => const LoginScreen(), settings: settings);
+      case '/register':
+        return MaterialPageRoute(builder: (_) => const RegisterScreen(), settings: settings);
+      case '/guest-properties':
+        return MaterialPageRoute(builder: (_) => const GuestPropertiesScreen(), settings: settings);
+      case '/home':
+        return MaterialPageRoute(builder: (_) => const HomeScreen(), settings: settings);
+      case '/payments':
+        return MaterialPageRoute(builder: (_) => const PaymentsScreen(), settings: settings);
+      case '/maintenance':
+        return MaterialPageRoute(builder: (_) => const MaintenanceListScreen(), settings: settings);
+      case '/create-maintenance':
+        return MaterialPageRoute(builder: (_) => const CreateMaintenanceScreen(), settings: settings);
+      case '/profile':
+        return MaterialPageRoute(builder: (_) => const ProfileScreen(), settings: settings);
+      default:
+        return MaterialPageRoute(builder: (_) => const LoginScreen(), settings: settings);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,17 +161,10 @@ class _RentalAppState extends State<RentalApp> {
           elevation: 0,
         ),
       ),
-      home: _authService.isAuthenticated() 
-          ? const HomeScreen() 
+      home: _authService.isAuthenticated()
+          ? const HomeScreen()
           : const LoginScreen(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/payments': (context) => const PaymentsScreen(),
-        '/maintenance': (context) => const MaintenanceListScreen(),
-        '/create-maintenance': (context) => const CreateMaintenanceScreen(),
-        '/profile': (context) => const ProfileScreen(),
-      },
+      onGenerateRoute: _onGenerateRoute,
     );
   }
 }
