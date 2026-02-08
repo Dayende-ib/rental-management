@@ -470,6 +470,11 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('documents', 'documents', false)
 ON CONFLICT (id) DO NOTHING;
 
+-- Bucket pour les preuves de paiement
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payment-proofs', 'payment-proofs', true)
+ON CONFLICT (id) DO NOTHING;
+
 -- Politiques de stockage
 DO $$
 BEGIN
@@ -496,6 +501,31 @@ BEGIN
     ) THEN
         CREATE POLICY "Authenticated delete property photos" ON storage.objects
         FOR DELETE TO authenticated USING (bucket_id = 'property-photos');
+    END IF;
+
+    -- Preuves de paiement publiques
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Public read payment proofs'
+    ) THEN
+        CREATE POLICY "Public read payment proofs" ON storage.objects
+        FOR SELECT USING (bucket_id = 'payment-proofs');
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Authenticated upload payment proofs'
+    ) THEN
+        CREATE POLICY "Authenticated upload payment proofs" ON storage.objects
+        FOR INSERT TO authenticated WITH CHECK (bucket_id = 'payment-proofs');
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Authenticated delete payment proofs'
+    ) THEN
+        CREATE POLICY "Authenticated delete payment proofs" ON storage.objects
+        FOR DELETE TO authenticated USING (bucket_id = 'payment-proofs');
     END IF;
 
     -- Documents privés

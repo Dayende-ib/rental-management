@@ -53,7 +53,7 @@ const getContractById = async (req, res, next) => {
             .from('contracts')
             .select('*, properties(title)')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Contract not found' });

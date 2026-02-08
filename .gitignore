@@ -86,3 +86,5 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
+backend/package-lock.json
+backend/package-lock.json

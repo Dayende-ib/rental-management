@@ -68,7 +68,7 @@ const getPropertyById = async (req, res, next) => {
             .from('properties')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Property not found' });
@@ -127,7 +127,12 @@ const deleteProperty = async (req, res, next) => {
 const uploadPropertyPhoto = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { imageBase64, mimeType } = req.body;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ error: 'Missing file upload' });
+        }
+        const mimeType = file.mimetype;
 
         const userClient = createUserClient(req.token);
 
@@ -136,12 +141,12 @@ const uploadPropertyPhoto = async (req, res, next) => {
             .from('properties')
             .select('id, photos')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
         if (propertyError) throw propertyError;
         if (!property) return res.status(404).json({ error: 'Property not found' });
 
-        const buffer = Buffer.from(imageBase64, 'base64');
+        const buffer = file.buffer;
         const ext = (mimeType && mimeType.split('/')[1]) || 'png';
         const timestamp = Date.now();
         const filename = `properties/${id}/photo_${timestamp}.${ext}`;

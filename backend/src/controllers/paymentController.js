@@ -75,10 +75,14 @@ const updatePayment = async (req, res, next) => {
 const uploadPaymentProof = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { imageBase64, mimeType } = req.body;
+        const file = req.file;
 
-        // convert base64 to buffer
-        const buffer = Buffer.from(imageBase64, 'base64');
+        if (!file) {
+            return res.status(400).json({ error: 'Missing file upload' });
+        }
+
+        const mimeType = file.mimetype;
+        const buffer = file.buffer;
 
         // determine extension
         const ext = (mimeType && mimeType.split('/')[1]) || 'png';

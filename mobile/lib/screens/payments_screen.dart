@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/models.dart';
@@ -17,8 +17,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   final PaymentService _paymentService = PaymentService();
   late Future<List<Payment>> _paymentsFuture;
   final ImagePicker _picker = ImagePicker();
-  final Map<String, String?> _proofs = {};
+  final Map<String, Uint8List?> _proofs = {};
   final Map<String, String?> _proofMimeTypes = {};
+  final Map<String, String?> _proofFileNames = {};
 
   @override
   void initState() {
@@ -37,7 +38,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     await _paymentsFuture;
   }
 
-  Future<Map<String, String>?> _pickProof() async {
+  Future<Map<String, dynamic>?> _pickProof() async {
     final XFile? file = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 75,
@@ -45,8 +46,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     if (file == null) return null;
     final bytes = await file.readAsBytes();
     return {
-      'base64': base64Encode(bytes),
+      'bytes': bytes,
       'mimeType': _inferMimeType(file.path),
+      'fileName': file.name,
     };
   }
 
@@ -62,6 +64,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     setState(() {
       _proofs.remove(paymentId);
       _proofMimeTypes.remove(paymentId);
+      _proofFileNames.remove(paymentId);
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Preuve supprimée')),
@@ -71,12 +74,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   void _showProof(String paymentId) {
     final proof = _proofs[paymentId];
     if (proof == null) return;
-    final bytes = base64Decode(proof);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Preuve'),
-        content: Image.memory(bytes),
+        content: Image.memory(proof),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -91,8 +93,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     final proof = await _pickProof();
     if (!mounted) return;
     setState(() {
-      _proofs[paymentId] = proof?['base64'];
-      _proofMimeTypes[paymentId] = proof?['mimeType'];
+      _proofs[paymentId] = proof?['bytes'] as Uint8List?;
+      _proofMimeTypes[paymentId] = proof?['mimeType'] as String?;
+      _proofFileNames[paymentId] = proof?['fileName'] as String?;
     });
     if (proof != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -130,10 +133,12 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       if (!mounted) return;
       final proof = _proofs[payment.id];
       final proofMimeType = _proofMimeTypes[payment.id];
+      final proofFileName = _proofFileNames[payment.id];
       final success = await _paymentService.makePayment(
         payment.id,
-        proofBase64: proof,
+        proofBytes: proof,
         proofMimeType: proofMimeType,
+        proofFileName: proofFileName,
       );
       if (!mounted) return;
       if (success) {

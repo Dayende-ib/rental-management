@@ -3,6 +3,7 @@ const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const authMiddleware = require('../middlewares/auth');
 const validatePaymentProof = require('../middlewares/validatePaymentProof');
+const upload = require('../middlewares/upload');
 
 /**
  * @swagger
@@ -14,6 +15,6 @@ const validatePaymentProof = require('../middlewares/validatePaymentProof');
 router.get('/', authMiddleware, paymentController.getPayments);
 router.post('/', authMiddleware, paymentController.createPayment);
 router.put('/:id', authMiddleware, paymentController.updatePayment);
-router.post('/:id/proof', authMiddleware, validatePaymentProof, paymentController.uploadPaymentProof);
+router.post('/:id/proof', authMiddleware, upload.single('file'), validatePaymentProof, paymentController.uploadPaymentProof);
 
 module.exports = router;

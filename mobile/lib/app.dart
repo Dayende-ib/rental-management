@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:rental_management/auth/auth_service.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/payments_screen.dart';
-import 'screens/maintenance_list_screen.dart';
-import 'screens/create_maintenance_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/guest_properties_screen.dart';
-import 'screens/available_properties_screen.dart';
+import 'package:rental_management/screens/login_screen.dart';
+import 'package:rental_management/screens/home_screen.dart';
+import 'package:rental_management/screens/payments_screen.dart';
+import 'package:rental_management/screens/maintenance_list_screen.dart';
+import 'package:rental_management/screens/create_maintenance_screen.dart';
+import 'package:rental_management/screens/profile_screen.dart';
+import 'package:rental_management/screens/register_screen.dart';
+import 'package:rental_management/screens/guest_properties_screen.dart';
+import 'package:rental_management/screens/available_properties_screen.dart';
 import 'package:rental_management/core/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 

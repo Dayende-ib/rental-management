@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
@@ -31,8 +32,9 @@ class PaymentService {
   /// Submit payment proof or mark payment as pending
   Future<bool> makePayment(
     String paymentId, {
-    String? proofBase64,
+    Uint8List? proofBytes,
     String? proofMimeType,
+    String? proofFileName,
   }) async {
     try {
       await _apiClient.put(
@@ -43,13 +45,12 @@ class PaymentService {
         },
       );
 
-      if (proofBase64 != null && proofBase64.isNotEmpty) {
-        await _apiClient.post(
+      if (proofBytes != null && proofBytes.isNotEmpty) {
+        await _apiClient.uploadFile(
           '${AppConstants.paymentsEndpoint}/$paymentId/proof',
-          body: {
-            'imageBase64': proofBase64,
-            'mimeType': proofMimeType ?? 'image/jpeg',
-          },
+          bytes: proofBytes,
+          filename: proofFileName ?? 'proof.jpg',
+          mimeType: proofMimeType ?? 'image/jpeg',
         );
       }
       return true;

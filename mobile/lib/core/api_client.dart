@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'constants.dart';
 import 'storage.dart';
 
@@ -15,6 +16,13 @@ class ApiClient {
     final token = StorageService.getToken();
     return {
       'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Map<String, String> get _authOnlyHeaders {
+    final token = StorageService.getToken();
+    return {
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }
@@ -152,6 +160,51 @@ class ApiClient {
 
       final data = await _handleResponse(response);
       if (data is List<dynamic>) {
+        return data;
+      }
+      throw ApiException('Unexpected response format', response.statusCode);
+    } on SocketException {
+      throw ApiException('No internet connection', 0);
+    } on TimeoutException {
+      throw ApiException('Request timeout', 0);
+    } catch (e) {
+      throw ApiException('Network error: $e', 0);
+    }
+  }
+
+  /// POST multipart request with file upload
+  Future<Map<String, dynamic>> uploadFile(
+    String endpoint, {
+    required List<int> bytes,
+    required String filename,
+    String? mimeType,
+    Map<String, String>? fields,
+    bool requiresAuth = true,
+  }) async {
+    final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
+    final headers = requiresAuth ? _authOnlyHeaders : <String, String>{};
+
+    try {
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll(headers);
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+          contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+        ),
+      );
+
+      final streamed = await request.send().timeout(
+            Duration(seconds: AppConstants.apiTimeoutSeconds),
+          );
+      final response = await http.Response.fromStream(streamed);
+      final data = await _handleResponse(response);
+      if (data is Map<String, dynamic>) {
         return data;
       }
       throw ApiException('Unexpected response format', response.statusCode);

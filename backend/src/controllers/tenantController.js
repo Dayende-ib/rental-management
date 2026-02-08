@@ -80,7 +80,7 @@ const getTenantById = async (req, res, next) => {
             .from('tenants')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Tenant not found' });

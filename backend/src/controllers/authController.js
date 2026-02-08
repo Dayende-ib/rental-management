@@ -106,9 +106,10 @@ const getProfile = async (req, res, next) => {
             .from('profiles')
             .select('*')
             .eq('id', req.user.id)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Profile not found' });
         res.status(200).json(data);
     } catch (err) {
         next(err);

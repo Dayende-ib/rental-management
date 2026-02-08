@@ -3,6 +3,7 @@ const router = express.Router();
 const propertyController = require('../controllers/propertyController');
 const authMiddleware = require('../middlewares/auth');
 const validatePaymentProof = require('../middlewares/validatePaymentProof');
+const upload = require('../middlewares/upload');
 
 /**
  * @swagger
@@ -130,16 +131,14 @@ router.put('/:id', authMiddleware, propertyController.updateProperty);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [imageBase64, mimeType]
+ *             required: [file]
  *             properties:
- *               imageBase64:
+ *               file:
  *                 type: string
- *               mimeType:
- *                 type: string
- *                 example: image/jpeg
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Photo uploaded
@@ -148,7 +147,7 @@ router.put('/:id', authMiddleware, propertyController.updateProperty);
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/photos', authMiddleware, validatePaymentProof, propertyController.uploadPropertyPhoto);
+router.post('/:id/photos', authMiddleware, upload.single('file'), validatePaymentProof, propertyController.uploadPropertyPhoto);
 
 /**
  * @swagger
