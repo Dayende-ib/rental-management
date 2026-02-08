@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
@@ -44,7 +45,7 @@ class MaintenanceService {
       );
       return true;
     } catch (e) {
-      print('Maintenance request error: $e');
+      debugPrint('Maintenance request error: $e');
       return false;
     }
   }

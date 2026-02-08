@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
-import '../maintenance/maintenance_service.dart';
-import '../core/constants.dart';
+import 'package:rental_management/maintenance/maintenance_service.dart';
+import 'package:rental_management/core/constants.dart';
 
-/// Screen for creating new maintenance requests
+/// Écran pour créer une nouvelle demande de maintenance
 class CreateMaintenanceScreen extends StatefulWidget {
   const CreateMaintenanceScreen({super.key});
 
   @override
-  State<CreateMaintenanceScreen> createState() => _CreateMaintenanceScreenState();
+  State<CreateMaintenanceScreen> createState() =>
+      _CreateMaintenanceScreenState();
 }
 
 class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
-  final MaintenanceService _maintenanceService = MaintenanceService();
   final _formKey = GlobalKey<FormState>();
-  final _descriptionController = TextEditingController();
-  bool _isLoading = false;
+  final TextEditingController _descriptionController = TextEditingController();
+  final MaintenanceService _maintenanceService = MaintenanceService();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -22,142 +23,63 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
     super.dispose();
   }
 
-  /// Handle submit button press
-  Future<void> _handleSubmit() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
 
-    setState(() {
-      _isLoading = true;
-    });
+    final success = await _maintenanceService.createMaintenanceRequest(
+      _descriptionController.text.trim(),
+    );
 
-    try {
-      final success = await _maintenanceService.createMaintenanceRequest(
-        _descriptionController.text.trim(),
-      );
+    setState(() => _isSubmitting = false);
 
-      if (!mounted) return;
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Demande de maintenance creee avec succes'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Navigate back to maintenance list
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la creation de la demande'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Demande créée avec succès')),
       );
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Échec de la création de la demande')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nouvelle Demande'),
-      ),
+      appBar: AppBar(title: const Text('Nouvelle demande de maintenance')),
       body: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Decrivez votre probleme de maintenance',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 20),
-
-              // Description input
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description detaillee',
-                  hintText:
-                      'Ex: Fuite d\'eau dans la cuisine, prise electrique defectueuse...',
-                  alignLabelWithHint: true,
-                ),
+                keyboardType: TextInputType.multiline,
                 maxLines: 6,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez decrire votre probleme';
-                  }
-                  if (value.length < 10) {
-                    return 'La description doit contenir au moins 10 caracteres';
+                minLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Décrivez le problème...',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'La description est requise';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
-
-              // Tips
-              Container(
-                padding: EdgeInsets.all(AppConstants.smallPadding),
-                decoration: BoxDecoration(
-                  color: const Color(AppColors.surface),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(AppColors.border)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Conseils pour une bonne description:',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: const Color(AppColors.accent),
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('� Soyez precis sur l\'emplacement',
-                        style: Theme.of(context).textTheme.bodySmall),
-                    Text('� Decrivez quand le probleme est apparu',
-                        style: Theme.of(context).textTheme.bodySmall),
-                    Text('� Indiquez si c\'est urgent',
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Submit button
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
+                height: AppConstants.buttonHeight,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSubmit,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Envoyer la demande',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                  onPressed: _isSubmitting ? null : _submit,
+                  child: _isSubmitting
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Soumettre'),
                 ),
               ),
             ],

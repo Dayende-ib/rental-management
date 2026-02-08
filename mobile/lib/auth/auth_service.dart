@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/storage.dart';
 import '../core/constants.dart';
@@ -33,7 +34,7 @@ class AuthService {
       }
       return true;
     } catch (e) {
-      print('Login error: $e');
+      debugPrint('Login error: $e');
       return false;
     }
   }
@@ -65,7 +66,7 @@ class AuthService {
       // If backend doesn't return a session, try logging in
       return await login(normalizedEmail, password);
     } catch (e) {
-      print('Register error: $e');
+      debugPrint('Register error: $e');
       return false;
     }
   }

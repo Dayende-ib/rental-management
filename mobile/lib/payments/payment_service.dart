@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
@@ -53,7 +54,7 @@ class PaymentService {
       }
       return true;
     } catch (e) {
-      print('Payment error: $e');
+      debugPrint('Payment error: $e');
       return false;
     }
   }
