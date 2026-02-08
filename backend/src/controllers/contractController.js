@@ -37,7 +37,7 @@ const getContracts = async (req, res, next) => {
     try {
         const { data, error } = await supabase
             .from('contracts')
-            .select('*, properties(title), tenants(full_name)');
+            .select('*, properties(title)');
 
         if (error) throw error;
         res.status(200).json(data);
@@ -51,7 +51,7 @@ const getContractById = async (req, res, next) => {
         const { id } = req.params;
         const { data, error } = await supabase
             .from('contracts')
-            .select('*, properties(title), tenants(full_name)')
+            .select('*, properties(title)')
             .eq('id', id)
             .single();
 

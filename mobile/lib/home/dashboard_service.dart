@@ -77,6 +77,9 @@ class DashboardService {
           city: property.city,
           postalCode: property.postalCode,
           monthlyRent: rent,
+          surface: property.surface,
+          rooms: property.rooms,
+          photos: property.photos,
         );
       }
       return property;
@@ -92,6 +95,9 @@ class DashboardService {
       city: '',
       postalCode: '',
       monthlyRent: 0,
+      surface: 0,
+      rooms: 0,
+      photos: const [],
     );
   }
 

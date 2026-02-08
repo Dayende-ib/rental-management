@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -23,6 +24,19 @@ const supabase = require('../config/supabase');
  *         address:
  *           type: string
  *           description: Full address
+ *         city:
+ *           type: string
+ *         postal_code:
+ *           type: string
+ *         surface:
+ *           type: number
+ *           description: Surface in square meters
+ *         rooms:
+ *           type: integer
+ *         photos:
+ *           type: array
+ *           items:
+ *             type: string
  *         price:
  *           type: number
  *           description: Monthly rent or sale price
@@ -110,10 +124,60 @@ const deleteProperty = async (req, res, next) => {
     }
 };
 
+const uploadPropertyPhoto = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { imageBase64, mimeType } = req.body;
+
+        const userClient = createUserClient(req.token);
+
+        // ensure property exists
+        const { data: property, error: propertyError } = await userClient
+            .from('properties')
+            .select('id, photos')
+            .eq('id', id)
+            .single();
+
+        if (propertyError) throw propertyError;
+        if (!property) return res.status(404).json({ error: 'Property not found' });
+
+        const buffer = Buffer.from(imageBase64, 'base64');
+        const ext = (mimeType && mimeType.split('/')[1]) || 'png';
+        const timestamp = Date.now();
+        const filename = `properties/${id}/photo_${timestamp}.${ext}`;
+        const bucket = 'property-photos';
+
+        const { error: uploadError } = await userClient.storage
+            .from(bucket)
+            .upload(filename, buffer, { contentType: mimeType, upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicData } = userClient.storage.from(bucket).getPublicUrl(filename);
+        const publicUrl = publicData && publicData.publicUrl ? publicData.publicUrl : null;
+
+        const existingPhotos = Array.isArray(property.photos) ? property.photos : [];
+        const updatedPhotos = publicUrl ? [...existingPhotos, publicUrl] : existingPhotos;
+
+        const { data, error } = await userClient
+            .from('properties')
+            .update({ photos: updatedPhotos })
+            .eq('id', id)
+            .select();
+
+        if (error) throw error;
+        if (!data.length) return res.status(404).json({ error: 'Property not found' });
+        res.status(200).json(data[0]);
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getProperties,
     getPropertyById,
     createProperty,
     updateProperty,
     deleteProperty,
+    uploadPropertyPhoto,
 };

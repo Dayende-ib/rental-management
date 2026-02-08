@@ -269,6 +269,23 @@ class _HomeScreenState extends State<HomeScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+            if (property.photos.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    property.photos.first,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(AppColors.border),
+                      child: const Icon(Icons.image_not_supported),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 const Icon(Icons.location_on, color: Color(AppColors.accent)),
@@ -291,6 +308,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+            if (property.surface > 0 || property.rooms > 0) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 6,
+                children: [
+                  if (property.surface > 0)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.square_foot, size: 16, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text('${property.surface.toStringAsFixed(0)} m²'),
+                      ],
+                    ),
+                  if (property.rooms > 0)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.meeting_room, size: 16, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text('${property.rooms} pieces'),
+                      ],
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -331,6 +375,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              icon: Icons.home_work,
+              label: 'Proprietes',
+              onPressed: () => Navigator.pushNamed(context, '/properties'),
+              startColor: Colors.indigo.shade700,
+              endColor: Colors.indigo.shade400,
             ),
           ],
         ),

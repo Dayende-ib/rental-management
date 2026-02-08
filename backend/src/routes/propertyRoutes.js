@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const propertyController = require('../controllers/propertyController');
 const authMiddleware = require('../middlewares/auth');
+const validatePaymentProof = require('../middlewares/validatePaymentProof');
 
 /**
  * @swagger
@@ -111,6 +112,43 @@ router.post('/', authMiddleware, propertyController.createProperty);
  *         description: Unauthorized
  */
 router.put('/:id', authMiddleware, propertyController.updateProperty);
+
+/**
+ * @swagger
+ * /api/properties/{id}/photos:
+ *   post:
+ *     summary: Upload a property photo (base64)
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [imageBase64, mimeType]
+ *             properties:
+ *               imageBase64:
+ *                 type: string
+ *               mimeType:
+ *                 type: string
+ *                 example: image/jpeg
+ *     responses:
+ *       200:
+ *         description: Photo uploaded
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/:id/photos', authMiddleware, validatePaymentProof, propertyController.uploadPropertyPhoto);
 
 /**
  * @swagger

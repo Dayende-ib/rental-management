@@ -32,7 +32,7 @@ const getPayments = async (req, res, next) => {
     try {
         const { data, error } = await supabase
             .from('payments')
-            .select('*, contracts(id, tenant_id, tenants(full_name))');
+            .select('*, contracts(id, tenant_id)');
 
         if (error) throw error;
         res.status(200).json(data);

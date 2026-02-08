@@ -3,17 +3,33 @@ import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
 
-/// Guest view listing available properties
-class GuestPropertiesScreen extends StatefulWidget {
-  const GuestPropertiesScreen({super.key});
+class AvailablePropertyItem {
+  final Property property;
+  final String status;
+  final String type;
+  final String description;
 
-  @override
-  State<GuestPropertiesScreen> createState() => _GuestPropertiesScreenState();
+  AvailablePropertyItem({
+    required this.property,
+    required this.status,
+    required this.type,
+    required this.description,
+  });
+
+  bool get isAvailable => status.isEmpty || status == 'available';
 }
 
-class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
+/// Authenticated view listing available properties
+class AvailablePropertiesScreen extends StatefulWidget {
+  const AvailablePropertiesScreen({super.key});
+
+  @override
+  State<AvailablePropertiesScreen> createState() => _AvailablePropertiesScreenState();
+}
+
+class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   final ApiClient _apiClient = ApiClient();
-  late Future<List<Property>> _propertiesFuture;
+  late Future<List<AvailablePropertyItem>> _propertiesFuture;
 
   @override
   void initState() {
@@ -21,18 +37,24 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
     _propertiesFuture = _loadProperties();
   }
 
-  Future<List<Property>> _loadProperties() async {
-    final data = await _apiClient.getList(
-      AppConstants.propertiesEndpoint,
-      requiresAuth: false,
-    );
-    final properties = <Property>[];
+  Future<List<AvailablePropertyItem>> _loadProperties() async {
+    final data = await _apiClient.getList(AppConstants.propertiesEndpoint);
+    final properties = <AvailablePropertyItem>[];
     for (final item in data) {
       if (item is Map<String, dynamic>) {
         final status = (item['status'] ?? '').toString();
-        if (status.isEmpty || status == 'available') {
-          properties.add(Property.fromJson(item));
+        if (status.isNotEmpty && status != 'available') {
+          continue;
         }
+        final property = Property.fromJson(item);
+        properties.add(
+          AvailablePropertyItem(
+            property: property,
+            status: status,
+            type: (item['type'] ?? '').toString(),
+            description: (item['description'] ?? '').toString(),
+          ),
+        );
       }
     }
     return properties;
@@ -51,7 +73,7 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
       appBar: AppBar(
         title: const Text('Biens disponibles'),
       ),
-      body: FutureBuilder<List<Property>>(
+      body: FutureBuilder<List<AvailablePropertyItem>>(
         future: _propertiesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -83,56 +105,11 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(AppConstants.defaultPadding),
               children: [
-                _buildHeader(context),
-                const SizedBox(height: 16),
-                if (properties.isEmpty)
-                  _buildEmptyState()
-                else
-                  ...properties.map(_buildPropertyCard),
+                if (properties.isEmpty) _buildEmptyState() else ...properties.map(_buildPropertyCard),
               ],
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Decouvrez nos biens a louer',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Connectez-vous ou creez un compte pour reserver et gerer vos paiements.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/login'),
-                    child: const Text('Se connecter'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/register'),
-                    child: const Text('Creer un compte'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -150,10 +127,12 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
     );
   }
 
-  Widget _buildPropertyCard(Property property) {
+  Widget _buildPropertyCard(AvailablePropertyItem item) {
+    final property = item.property;
     final rentText = property.monthlyRent > 0
         ? '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois'
         : 'Loyer sur demande';
+    final location = '${property.postalCode} ${property.city}'.trim();
     final surfaceText =
         property.surface > 0 ? '${property.surface.toStringAsFixed(0)} m²' : '';
     final roomsText = property.rooms > 0 ? '${property.rooms} pieces' : '';
@@ -192,11 +171,30 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(AppColors.accentLight),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Disponible',
+                    style: TextStyle(
+                      color: Color(AppColors.accent),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (property.city.isNotEmpty || property.postalCode.isNotEmpty)
-              Text('${property.postalCode} ${property.city}'.trim()),
+            if (item.type.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Type: ${item.type}'),
+            ],
+            if (location.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(location),
+            ],
             if (surfaceText.isNotEmpty || roomsText.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
@@ -229,6 +227,10 @@ class _GuestPropertiesScreenState extends State<GuestPropertiesScreen> {
               rentText,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
+            if (item.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(item.description),
+            ],
           ],
         ),
       ),

@@ -8,6 +8,7 @@ import 'package:rental_management/screens/create_maintenance_screen.dart';
 import 'package:rental_management/screens/profile_screen.dart';
 import 'package:rental_management/screens/register_screen.dart';
 import 'package:rental_management/screens/guest_properties_screen.dart';
+import 'package:rental_management/screens/available_properties_screen.dart';
 import 'package:rental_management/core/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -46,6 +47,8 @@ class _RentalAppState extends State<RentalApp> {
         return MaterialPageRoute(builder: (_) => const RegisterScreen(), settings: settings);
       case '/guest-properties':
         return MaterialPageRoute(builder: (_) => const GuestPropertiesScreen(), settings: settings);
+      case '/properties':
+        return MaterialPageRoute(builder: (_) => const AvailablePropertiesScreen(), settings: settings);
       case '/home':
         return MaterialPageRoute(builder: (_) => const HomeScreen(), settings: settings);
       case '/payments':

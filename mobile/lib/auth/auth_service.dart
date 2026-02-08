@@ -59,8 +59,11 @@ class AuthService {
         if (userId != null && userId.isNotEmpty) {
           await StorageService.saveUserId(userId);
         }
+        return true;
       }
-      return true;
+
+      // If backend doesn't return a session, try logging in
+      return await login(normalizedEmail, password);
     } catch (e) {
       print('Register error: $e');
       return false;

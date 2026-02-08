@@ -41,6 +41,9 @@ class Property {
   final String city;
   final String postalCode;
   final double monthlyRent;
+  final double surface;
+  final int rooms;
+  final List<String> photos;
 
   Property({
     required this.id,
@@ -48,9 +51,20 @@ class Property {
     required this.city,
     required this.postalCode,
     required this.monthlyRent,
+    this.surface = 0,
+    this.rooms = 0,
+    this.photos = const [],
   });
 
   factory Property.fromJson(Map<String, dynamic> json) {
+    final photosRaw = json['photos'];
+    List<String> photos = [];
+    if (photosRaw is List) {
+      photos = photosRaw.whereType<String>().toList();
+    } else if (photosRaw is String && photosRaw.isNotEmpty) {
+      photos = [photosRaw];
+    }
+
     return Property(
       id: json['id'] as String,
       address: (json['address'] ?? json['title'] ?? '').toString(),
@@ -59,6 +73,9 @@ class Property {
       monthlyRent: _parseDouble(
         json['monthlyRent'] ?? json['monthly_rent'] ?? json['price'],
       ),
+      surface: _parseDouble(json['surface']),
+      rooms: _parseInt(json['rooms'] ?? json['pieces']),
+      photos: photos,
     );
   }
 }
@@ -196,6 +213,13 @@ DateTime? _parseDate(dynamic value) {
 double _parseDouble(dynamic value) {
   if (value is num) return value.toDouble();
   if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+int _parseInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
 
