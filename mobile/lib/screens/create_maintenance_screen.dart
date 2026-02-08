@@ -35,25 +35,27 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
         _descriptionController.text.trim(),
       );
 
+      if (!mounted) return;
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Demande de maintenance créée avec succès'),
+            content: Text('Demande de maintenance creee avec succes'),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Navigate back to maintenance list
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erreur lors de la création de la demande'),
+            content: Text('Erreur lors de la creation de la demande'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur: $e'),
@@ -61,6 +63,7 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
         ),
       );
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -81,7 +84,7 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Décrivez votre problème de maintenance',
+                'Decrivez votre probleme de maintenance',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 20),
@@ -90,17 +93,18 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description détaillée',
-                  hintText: 'Ex: Fuite d\'eau dans la cuisine, prise électrique défectueuse...',
+                  labelText: 'Description detaillee',
+                  hintText:
+                      'Ex: Fuite d\'eau dans la cuisine, prise electrique defectueuse...',
                   alignLabelWithHint: true,
                 ),
                 maxLines: 6,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Veuillez décrire votre problème';
+                    return 'Veuillez decrire votre probleme';
                   }
                   if (value.length < 10) {
-                    return 'La description doit contenir au moins 10 caractères';
+                    return 'La description doit contenir au moins 10 caracteres';
                   }
                   return null;
                 },
@@ -125,9 +129,12 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    Text('• Soyez précis sur l\'emplacement', style: Theme.of(context).textTheme.bodySmall),
-                    Text('• Décrivez quand le problème est apparu', style: Theme.of(context).textTheme.bodySmall),
-                    Text('• Indiquez si c\'est urgent', style: Theme.of(context).textTheme.bodySmall),
+                    Text('� Soyez precis sur l\'emplacement',
+                        style: Theme.of(context).textTheme.bodySmall),
+                    Text('� Decrivez quand le probleme est apparu',
+                        style: Theme.of(context).textTheme.bodySmall),
+                    Text('� Indiquez si c\'est urgent',
+                        style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
