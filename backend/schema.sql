@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS properties (
     address TEXT NOT NULL,
     city TEXT,
     postal_code TEXT,
-    country TEXT DEFAULT 'Burkina Faso',
+    country TEXT DEFAULT 'France',
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
     surface DECIMAL(10, 2),
@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS properties (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Ensure existing deployments have the price column even if the table already existed
+ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS price DECIMAL(12, 2);
 
 -- Locataires
 CREATE TABLE IF NOT EXISTS tenants (
