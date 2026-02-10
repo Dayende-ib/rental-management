@@ -109,14 +109,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      AppConstants.appName,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                      textAlign: TextAlign.center,
+                    GestureDetector(
+                      onLongPress: () =>
+                          Navigator.pushNamed(context, '/debug-settings'),
+                      child: Text(
+                        AppConstants.appName,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                     const SizedBox(height: 28),
 

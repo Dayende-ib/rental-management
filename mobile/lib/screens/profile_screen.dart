@@ -15,9 +15,7 @@ class ProfileScreen extends ConsumerWidget {
     final authService = AuthService();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mon Profil'),
-      ),
+      appBar: AppBar(title: const Text('Mon Profil')),
       body: dashboardAsync.when(
         data: (data) => RefreshIndicator(
           onRefresh: () async {
@@ -28,7 +26,7 @@ class ProfileScreen extends ConsumerWidget {
             padding: EdgeInsets.all(AppConstants.defaultPadding),
             children: [
               // Profile header
-              _buildProfileHeader(data.tenant),
+              _buildProfileHeader(context, data.tenant),
               const SizedBox(height: 30),
 
               // Contact information
@@ -65,28 +63,29 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   /// Build profile header with avatar and name
-  Widget _buildProfileHeader(Tenant tenant) {
+  Widget _buildProfileHeader(BuildContext context, Tenant tenant) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.largePadding),
         child: Column(
           children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Color(AppColors.surface),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: Color(AppColors.accent),
+            GestureDetector(
+              onLongPress: () =>
+                  Navigator.pushNamed(context, '/debug-settings'),
+              child: const CircleAvatar(
+                radius: 50,
+                backgroundColor: Color(AppColors.surface),
+                child: Icon(
+                  Icons.person,
+                  size: 50,
+                  color: Color(AppColors.accent),
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               tenant.name.isNotEmpty ? tenant.name : 'Utilisateur',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -112,25 +111,29 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             const Text(
               'Informations de contact',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
-            
+
             // Email
             ListTile(
               leading: const Icon(Icons.email, color: Color(AppColors.accent)),
               title: const Text('Email'),
-              subtitle: Text(tenant.email.isNotEmpty ? tenant.email : 'Non disponible'),
+              subtitle: Text(
+                tenant.email.isNotEmpty ? tenant.email : 'Non disponible',
+              ),
             ),
-            
+
             // Phone
             ListTile(
-              leading: const Icon(Icons.phone, color: Color(AppColors.accentSoft)),
+              leading: const Icon(
+                Icons.phone,
+                color: Color(AppColors.accentSoft),
+              ),
               title: const Text('Téléphone'),
-              subtitle: Text(tenant.phone.isNotEmpty ? tenant.phone : 'Non disponible'),
+              subtitle: Text(
+                tenant.phone.isNotEmpty ? tenant.phone : 'Non disponible',
+              ),
             ),
           ],
         ),
@@ -148,25 +151,22 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             const Text(
               'À propos de l\'application',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
-            
+
             const ListTile(
               leading: Icon(Icons.info, color: Color(AppColors.accent)),
               title: Text('Version'),
               subtitle: Text('1.0.0'),
             ),
-            
+
             const ListTile(
               leading: Icon(Icons.security, color: Color(AppColors.accentSoft)),
               title: Text('Sécurité'),
               subtitle: Text('Connexion sécurisée par JWT'),
             ),
-            
+
             const ListTile(
               leading: Icon(Icons.support, color: Color(AppColors.accent)),
               title: Text('Support'),
@@ -193,10 +193,7 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             Icon(Icons.logout, size: 20),
             SizedBox(width: 8),
-            Text(
-              'Se déconnecter',
-              style: TextStyle(fontSize: 16),
-            ),
+            Text('Se déconnecter', style: TextStyle(fontSize: 16)),
           ],
         ),
       ),
@@ -204,7 +201,10 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   /// Handle logout
-  Future<void> _handleLogout(BuildContext context, AuthService authService) async {
+  Future<void> _handleLogout(
+    BuildContext context,
+    AuthService authService,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

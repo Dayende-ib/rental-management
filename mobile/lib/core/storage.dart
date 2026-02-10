@@ -46,6 +46,21 @@ class StorageService {
     return await _prefs.remove(AppConstants.userIdKey);
   }
 
+  /// Save custom backend URL to local storage
+  static Future<bool> saveBaseUrl(String url) async {
+    return await _prefs.setString(AppConstants.customBaseUrlKey, url);
+  }
+
+  /// Get custom backend URL from local storage
+  static String? getBaseUrl() {
+    return _prefs.getString(AppConstants.customBaseUrlKey);
+  }
+
+  /// Remove custom backend URL from local storage
+  static Future<bool> removeBaseUrl() async {
+    return await _prefs.remove(AppConstants.customBaseUrlKey);
+  }
+
   /// Clear all stored data (complete logout)
   static Future<bool> clearAll() async {
     return await _prefs.clear();

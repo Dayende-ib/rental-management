@@ -6,6 +6,7 @@ import 'package:rental_management/screens/guest_properties_screen.dart';
 import 'package:rental_management/screens/maintenance_list_screen.dart';
 import 'package:rental_management/screens/create_maintenance_screen.dart';
 import 'package:rental_management/navigation/main_navigation_screen.dart';
+import 'package:rental_management/screens/settings_debug_screen.dart';
 import 'package:rental_management/core/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -23,6 +24,7 @@ class _RentalAppState extends State<RentalApp> {
     '/login',
     '/register',
     '/guest-properties',
+    '/debug-settings',
   };
 
   Route<dynamic> _onGenerateRoute(RouteSettings settings) {
@@ -66,6 +68,11 @@ class _RentalAppState extends State<RentalApp> {
       case '/create-maintenance':
         return MaterialPageRoute(
           builder: (_) => const CreateMaintenanceScreen(),
+          settings: settings,
+        );
+      case '/debug-settings':
+        return MaterialPageRoute(
+          builder: (_) => const SettingsDebugScreen(),
           settings: settings,
         );
       default:

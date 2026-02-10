@@ -1,14 +1,25 @@
 import 'package:flutter/foundation.dart';
+import 'storage.dart';
 
 // Constants for the Rental Management Application
 class AppConstants {
   // API Configuration
-  static const String _defaultAndroidBaseUrl = 'http://10.0.2.2:5000/api';
-  static const String _defaultIosBaseUrl = 'http://localhost:5000/api';
-  static const String _defaultWebBaseUrl = 'http://localhost:5000/api';
-  static const String _defaultOtherBaseUrl = 'http://localhost:5000/api';
+  static const String _defaultAndroidBaseUrl =
+      'https://rental-management-production-e42c.up.railway.app/api';
+  static const String _defaultIosBaseUrl =
+      'https://rental-management-production-e42c.up.railway.app/api';
+  static const String _defaultWebBaseUrl =
+      'https://rental-management-production-e42c.up.railway.app/api';
+  static const String _defaultOtherBaseUrl =
+      'https://rental-management-production-e42c.up.railway.app/api';
 
   static String get baseUrl {
+    // Check local storage first (manual override)
+    final storedUrl = StorageService.getBaseUrl();
+    if (storedUrl != null && storedUrl.isNotEmpty) {
+      return storedUrl;
+    }
+
     const String envBaseUrl = String.fromEnvironment('API_BASE_URL');
     if (envBaseUrl.isNotEmpty) {
       return envBaseUrl;
@@ -35,15 +46,16 @@ class AppConstants {
   static const String maintenanceEndpoint = '/maintenance';
   static const String propertiesEndpoint = '/properties';
   static const String contractsEndpoint = '/contracts';
-  
+
   // Storage Keys
   static const String tokenKey = 'jwt_token';
   static const String userIdKey = 'user_id';
-  
+  static const String customBaseUrlKey = 'custom_base_url';
+
   // App Configuration
   static const String appName = 'Rental Management';
   static const int apiTimeoutSeconds = 30;
-  
+
   // UI Constants
   static const double defaultPadding = 16.0;
   static const double smallPadding = 8.0;
@@ -73,9 +85,5 @@ class AppColors {
   static const int accentSoft = _emeraldSoft;
   static const int accentLight = _emeraldLight;
 
-  static const List<int> gradient = [
-    _emerald,
-    _emeraldSoft,
-    _emeraldLight,
-  ];
+  static const List<int> gradient = [_emerald, _emeraldSoft, _emeraldLight];
 }
