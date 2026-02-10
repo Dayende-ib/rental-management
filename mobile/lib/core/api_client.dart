@@ -169,31 +169,40 @@ class ApiClient {
     }
   }
 
-  /// GET request returning a list
+  /// GET request returning a list with authentication support and retry
   Future<List<dynamic>> getList(
     String endpoint, {
     bool requiresAuth = true,
   }) async {
+    try {
+      return await _performGetList(endpoint, requiresAuth);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 && requiresAuth) {
+        final refreshed = await _refreshSession();
+        if (refreshed) {
+          return await _performGetList(endpoint, requiresAuth);
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> _performGetList(
+    String endpoint,
+    bool requiresAuth,
+  ) async {
     final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
     final headers = requiresAuth ? _authHeaders : <String, String>{};
 
-    try {
-      final response = await _client
-          .get(url, headers: headers)
-          .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
+    final response = await _client
+        .get(url, headers: headers)
+        .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
 
-      final data = await _handleResponse(response);
-      if (data is List<dynamic>) {
-        return data;
-      }
-      throw ApiException('Unexpected response format', response.statusCode);
-    } on SocketException {
-      throw ApiException('No internet connection', 0);
-    } on TimeoutException {
-      throw ApiException('Request timeout', 0);
-    } catch (e) {
-      throw ApiException('Network error: $e', 0);
+    final data = await _handleResponse(response);
+    if (data is List<dynamic>) {
+      return data;
     }
+    throw ApiException('Unexpected response format', response.statusCode);
   }
 
   /// POST multipart request with file upload

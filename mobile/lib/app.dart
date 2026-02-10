@@ -23,6 +23,7 @@ class _RentalAppState extends State<RentalApp> {
   final Set<String> _publicRoutes = const {
     '/login',
     '/register',
+    '/properties',
     '/guest-properties',
     '/debug-settings',
   };
@@ -50,6 +51,7 @@ class _RentalAppState extends State<RentalApp> {
           builder: (_) => const RegisterScreen(),
           settings: settings,
         );
+      case '/properties':
       case '/guest-properties':
         return MaterialPageRoute(
           builder: (_) => const GuestPropertiesScreen(),
