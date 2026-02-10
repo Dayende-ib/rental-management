@@ -88,3 +88,7 @@ coverage/
 Thumbs.db
 backend/package-lock.json
 backend/package-lock.json
+mobile/CHANGELOG_IMPROVEMENTS.md
+.gitignore
+mobile/MIGRATION_GUIDE.md
+mobile/IMPROVEMENTS.md

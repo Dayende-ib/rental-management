@@ -33,6 +33,8 @@ class _CreateMaintenanceScreenState extends State<CreateMaintenanceScreen> {
 
     setState(() => _isSubmitting = false);
 
+    if (!mounted) return;
+
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Demande créée avec succès')),

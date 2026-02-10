@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
@@ -66,7 +65,9 @@ class PaymentService {
       final tenantId = tenant['id']?.toString();
       if (tenantId == null || tenantId.isEmpty) return {};
 
-      final contracts = await _apiClient.getList(AppConstants.contractsEndpoint);
+      final contracts = await _apiClient.getList(
+        AppConstants.contractsEndpoint,
+      );
       final ids = <String>{};
       for (final item in contracts) {
         if (item is Map<String, dynamic> &&

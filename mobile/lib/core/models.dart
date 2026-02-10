@@ -32,11 +32,22 @@ class Tenant {
       'phone': phone,
     };
   }
+
+  /// Empty tenant instance for offline use
+  factory Tenant.empty() {
+    return Tenant(
+      id: '',
+      name: '',
+      email: '',
+      phone: '',
+    );
+  }
 }
 
 /// Property model
 class Property {
   final String id;
+  final String title;
   final String address;
   final String city;
   final String postalCode;
@@ -47,6 +58,7 @@ class Property {
 
   Property({
     required this.id,
+    required this.title,
     required this.address,
     required this.city,
     required this.postalCode,
@@ -67,6 +79,7 @@ class Property {
 
     return Property(
       id: json['id'] as String,
+      title: (json['title'] ?? json['address'] ?? '').toString(),
       address: (json['address'] ?? json['title'] ?? '').toString(),
       city: (json['city'] ?? '').toString(),
       postalCode: (json['postalCode'] ?? json['postal_code'] ?? '').toString(),
@@ -78,13 +91,30 @@ class Property {
       photos: photos,
     );
   }
+
+  /// Empty property instance for offline use
+  factory Property.empty() {
+    return Property(
+      id: '',
+      title: '',
+      address: '',
+      city: '',
+      postalCode: '',
+      monthlyRent: 0,
+      surface: 0,
+      rooms: 0,
+      photos: [],
+    );
+  }
 }
 
 /// Payment model
 class Payment {
   final String id;
+  final String contractId;
   final String month;
   final double amount;
+  final double amountPaid;
   final String status; // 'paid' or 'unpaid'
   final DateTime dueDate;
   final DateTime? paidDate;
@@ -92,8 +122,10 @@ class Payment {
 
   Payment({
     required this.id,
+    required this.contractId,
     required this.month,
     required this.amount,
+    required this.amountPaid,
     required this.status,
     required this.dueDate,
     this.paidDate,
@@ -120,8 +152,10 @@ class Payment {
 
     return Payment(
       id: json['id'] as String,
+      contractId: (json['contract_id'] ?? '').toString(),
       month: month,
       amount: _parseDouble(json['amount']),
+      amountPaid: _parseDouble(json['amount_paid']),
       status: status,
       dueDate: dueDate,
       paidDate: paidDate,
@@ -133,20 +167,38 @@ class Payment {
   bool get isPendingValidation => validationStatus == 'pending';
   bool get isRejected => validationStatus == 'rejected';
   bool get isValidated => validationStatus == 'validated';
+
+  /// Empty payment instance for offline use
+  factory Payment.empty() {
+    return Payment(
+      id: '',
+      contractId: '',
+      month: '',
+      amount: 0,
+      amountPaid: 0,
+      status: '',
+      dueDate: DateTime.now(),
+      validationStatus: '',
+    );
+  }
 }
 
 /// Maintenance request model
 class MaintenanceRequest {
   final String id;
+  final String propertyId;
   final String description;
   final String status; // 'pending', 'in_progress', 'completed'
+  final String urgency;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
   MaintenanceRequest({
     required this.id,
+    required this.propertyId,
     required this.description,
     required this.status,
+    required this.urgency,
     required this.createdAt,
     this.updatedAt,
   });
@@ -154,8 +206,10 @@ class MaintenanceRequest {
   factory MaintenanceRequest.fromJson(Map<String, dynamic> json) {
     return MaintenanceRequest(
       id: json['id'] as String,
+      propertyId: (json['property_id'] ?? '').toString(),
       description: json['description'] as String,
       status: json['status'] as String,
+      urgency: (json['urgency'] ?? 'normal').toString(),
       createdAt: _parseDate(
             json['createdAt'] ??
                 json['created_at'] ??
@@ -183,6 +237,18 @@ class MaintenanceRequest {
       default:
         return status;
     }
+  }
+
+  /// Empty maintenance request instance for offline use
+  factory MaintenanceRequest.empty() {
+    return MaintenanceRequest(
+      id: '',
+      propertyId: '',
+      description: '',
+      status: '',
+      urgency: 'normal',
+      createdAt: DateTime.now(),
+    );
   }
 }
 

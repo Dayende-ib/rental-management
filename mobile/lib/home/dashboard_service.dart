@@ -73,6 +73,7 @@ class DashboardService {
       if (rent > 0 && property.monthlyRent == 0) {
         return Property(
           id: property.id,
+          title: property.title,
           address: property.address,
           city: property.city,
           postalCode: property.postalCode,
@@ -91,6 +92,7 @@ class DashboardService {
     }
     return Property(
       id: '',
+      title: '',
       address: '',
       city: '',
       postalCode: '',

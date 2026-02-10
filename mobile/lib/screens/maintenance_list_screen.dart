@@ -1,39 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/models.dart';
-import '../maintenance/maintenance_service.dart';
+import '../core/providers/maintenance_providers.dart';
 import '../core/constants.dart';
 
 /// Maintenance requests list screen
-class MaintenanceListScreen extends StatefulWidget {
+class MaintenanceListScreen extends ConsumerWidget {
   const MaintenanceListScreen({super.key});
 
   @override
-  State<MaintenanceListScreen> createState() => _MaintenanceListScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requestsAsync = ref.watch(maintenanceRequestsProvider);
 
-class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
-  final MaintenanceService _maintenanceService = MaintenanceService();
-  late Future<List<MaintenanceRequest>> _requestsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _requestsFuture = _maintenanceService.getMaintenanceRequests();
-  }
-
-  void _loadMaintenanceRequests() {
-    setState(() {
-      _requestsFuture = _maintenanceService.getMaintenanceRequests();
-    });
-  }
- 
-  Future<void> _refreshMaintenanceRequests() async {
-    _loadMaintenanceRequests();
-    await _requestsFuture;
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Demandes'),
@@ -46,103 +24,54 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<MaintenanceRequest>>(
-        future: _requestsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 60, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Erreur: ${snapshot.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadMaintenanceRequests,
-                    child: const Text('Réessayer'),
-                  ),
-                ],
+      body: requestsAsync.when(
+        data: (requests) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(maintenanceRequestsProvider);
+          },
+          child: requests.isEmpty
+              ? _buildEmptyState(context)
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(AppConstants.defaultPadding),
+                  itemCount: requests.length,
+                  itemBuilder: (context, index) {
+                    return _buildMaintenanceCard(requests[index]);
+                  },
+                ),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, size: 60, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Erreur: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(maintenanceRequestsProvider),
+                child: const Text('Réessayer'),
               ),
-            );
-          }
-
-          final requests = snapshot.data!;
-          return RefreshIndicator(
-            onRefresh: _refreshMaintenanceRequests,
-            child: requests.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.all(AppConstants.defaultPadding),
-                    itemCount: requests.length,
-                    itemBuilder: (context, index) {
-                      return _buildMaintenanceCard(requests[index]);
-                    },
-                  ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.pushNamed(context, '/create-maintenance'),
         icon: const Icon(Icons.add),
         label: const Text('Nouvelle demande'),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 2,
-        onTap: (index) {
-          if (index != 2) { // Don't navigate if already on this screen
-            switch (index) {
-              case 0:
-                Navigator.pushReplacementNamed(context, '/home');
-                break;
-              case 1:
-                Navigator.pushReplacementNamed(context, '/payments');
-                break;
-              case 3:
-                Navigator.pushReplacementNamed(context, '/profile');
-                break;
-            }
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payment),
-            label: 'Paiements',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.build),
-            label: 'Maintenance',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-        ],
-      ),
     );
   }
 
   /// Build empty state when no maintenance requests
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.build,
-            size: 80,
-            color: Color(AppColors.textMuted),
-          ),
+          const Icon(Icons.build, size: 80, color: Color(AppColors.textMuted)),
           const SizedBox(height: 20),
           Text(
             'Aucune demande de maintenance',
@@ -220,11 +149,7 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
                     color: getStatusColor(),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    getStatusIcon(),
-                    color: Colors.black54,
-                    size: 18,
-                  ),
+                  child: Icon(getStatusIcon(), color: Colors.black54, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -241,7 +166,7 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen> {
                       const SizedBox(height: 4),
                       Text(
                         request.statusDisplay,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.black54,
                           fontWeight: FontWeight.w600,
                         ),

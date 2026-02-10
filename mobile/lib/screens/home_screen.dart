@@ -1,128 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
-import '../home/dashboard_service.dart';
+import '../core/providers/dashboard_providers.dart';
 
 /// Home/Dashboard screen showing tenant overview
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboardAsync = ref.watch(dashboardDataProvider);
 
-class _HomeScreenState extends State<HomeScreen> {
-  final DashboardService _dashboardService = DashboardService();
-  late Future<DashboardData> _dashboardFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _dashboardFuture = _dashboardService.getDashboardData();
-  }
-
-  Future<void> _refreshDashboardData() async {
-    setState(() {
-      _dashboardFuture = _dashboardService.getDashboardData();
-    });
-    await _dashboardFuture;
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: FutureBuilder<DashboardData>(
-        future: _dashboardFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError || !snapshot.hasData) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 60, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Erreur: ${snapshot.error ?? 'Données indisponibles'}',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _refreshDashboardData,
-                    child: const Text('Réessayer'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final dashboardData = snapshot.data!;
-          return RefreshIndicator(
-            onRefresh: _refreshDashboardData,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                _buildHeaderSliver(dashboardData.tenant, dashboardData.property),
-                SliverPadding(
-                  padding: EdgeInsets.all(AppConstants.defaultPadding),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      const SizedBox(height: 12),
-                      _buildPropertyCard(dashboardData.property),
-                      const SizedBox(height: 20),
-                      _buildQuickActions(),
-                      const SizedBox(height: 20),
-                      _buildUpcomingPayments(dashboardData.upcomingPayments),
-                      const SizedBox(height: 20),
-                      _buildMaintenanceSummary(dashboardData.pendingMaintenanceRequests),
-                    ]),
-                  ),
+      body: dashboardAsync.when(
+        data: (dashboardData) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(dashboardDataProvider);
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              _buildHeaderSliver(dashboardData.tenant, dashboardData.property),
+              SliverPadding(
+                padding: EdgeInsets.all(AppConstants.defaultPadding),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    const SizedBox(height: 12),
+                    _buildPropertyCard(context, dashboardData.property),
+                    const SizedBox(height: 20),
+                    _buildQuickActions(
+                      context,
+                      unpaidPayments: dashboardData.upcomingPayments
+                          .where((payment) => !payment.isPaid)
+                          .length,
+                      pendingMaintenance:
+                          dashboardData.pendingMaintenanceRequests,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildUpcomingPayments(
+                      context,
+                      dashboardData.upcomingPayments,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildMaintenanceSummary(
+                      context,
+                      dashboardData.pendingMaintenanceRequests,
+                    ),
+                  ]),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              Navigator.pushReplacementNamed(context, '/payments');
-              break;
-            case 2:
-              Navigator.pushReplacementNamed(context, '/maintenance');
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/profile');
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Accueil',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payment),
-            label: 'Paiements',
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, size: 60, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Erreur: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(dashboardDataProvider),
+                child: const Text('Réessayer'),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.build),
-            label: 'Maintenance',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -131,10 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = (tenant.name).isNotEmpty ? tenant.name : 'Utilisateur';
     final addressLine = [
       property.address,
-      '${property.postalCode} ${property.city}'
+      '${property.postalCode} ${property.city}',
     ].where((s) => s.isNotEmpty).join(', ');
-    final rentText =
-        property.monthlyRent.isFinite ? '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois' : 'Montant non dispo';
+    final rentText = property.monthlyRent.isFinite
+        ? '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois'
+        : 'Montant non dispo';
 
     return SliverAppBar(
       pinned: true,
@@ -145,9 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
       automaticallyImplyLeading: false,
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-          final double t = ((constraints.maxHeight - kToolbarHeight) /
-                  (240 - kToolbarHeight))
-              .clamp(0.0, 1.0);
+          final double t =
+              ((constraints.maxHeight - kToolbarHeight) /
+                      (240 - kToolbarHeight))
+                  .clamp(0.0, 1.0);
           final double headerOpacity = t;
           final double rentOpacity = t * t; // fade faster
           final double radius = 24 * t;
@@ -181,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
-                      child: Column(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -189,9 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               opacity: headerOpacity,
                               child: Text(
                                 name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
+                                style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
@@ -204,14 +151,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.home, size: 16, color: Colors.white70),
+                                  const Icon(
+                                    Icons.home,
+                                    size: 16,
+                                    color: Colors.white70,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       addressLine,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: Colors.white70,
-                                          ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.white70),
                                     ),
                                   ),
                                 ],
@@ -222,12 +174,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               opacity: rentOpacity,
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                  const Icon(Icons.attach_money, size: 16, color: Colors.white70),
+                                children: [
+                                  const Icon(
+                                    Icons.attach_money,
+                                    size: 16,
+                                    color: Colors.white70,
+                                  ),
                                   const SizedBox(width: 6),
                                   Text(
                                     rentText,
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -241,10 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       CircleAvatar(
                         radius: 24,
                         backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                        ),
+                        child: const Icon(Icons.person, color: Colors.white),
                       ),
                     ],
                   ),
@@ -257,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPropertyCard(Property property) {
+  Widget _buildPropertyCard(BuildContext context, Property property) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -300,7 +256,10 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.attach_money, color: Color(AppColors.accentSoft)),
+                const Icon(
+                  Icons.attach_money,
+                  color: Color(AppColors.accentSoft),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Loyer mensuel: ${property.monthlyRent.toStringAsFixed(0)} FCFA',
@@ -318,7 +277,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.square_foot, size: 16, color: Colors.black54),
+                        const Icon(
+                          Icons.square_foot,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
                         const SizedBox(width: 4),
                         Text('${property.surface.toStringAsFixed(0)} m²'),
                       ],
@@ -327,7 +290,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.meeting_room, size: 16, color: Colors.black54),
+                        const Icon(
+                          Icons.meeting_room,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
                         const SizedBox(width: 4),
                         Text('${property.rooms} pieces'),
                       ],
@@ -341,48 +308,89 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(
+    BuildContext context, {
+    required int unpaidPayments,
+    required int pendingMaintenance,
+  }) {
+    final paymentsSubtitle = unpaidPayments > 0
+        ? '$unpaidPayments a payer'
+        : 'Tout est a jour';
+    final maintenanceSubtitle = pendingMaintenance > 0
+        ? '$pendingMaintenance en cours'
+        : 'Aucune demande';
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Actions rapides',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: _buildActionButton(
-                    icon: Icons.payment,
-                    label: 'Paiements',
-                    onPressed: () => Navigator.pushNamed(context, '/payments'),
-                    startColor: const Color(AppColors.accent),
-                    endColor: const Color(AppColors.accentLight),
-                  ),
+                Text(
+                  'Actions rapides',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionButton(
-                    icon: Icons.build,
-                    label: 'Maintenance',
-                    onPressed: () => Navigator.pushNamed(context, '/maintenance'),
-                    startColor: Colors.orange.shade700,
-                    endColor: Colors.orange.shade400,
-                  ),
-                ),
+                const Spacer(),
+                Icon(Icons.bolt, size: 18, color: Colors.orange.shade600),
               ],
             ),
-            const SizedBox(height: 12),
-            _buildActionButton(
-              icon: Icons.home_work,
-              label: 'Proprietes',
-              onPressed: () => Navigator.pushNamed(context, '/properties'),
-              startColor: Colors.indigo.shade700,
-              endColor: Colors.indigo.shade400,
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const double spacing = 12;
+                final double itemWidth = (constraints.maxWidth - spacing) / 2;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildQuickActionTile(
+                        context,
+                        icon: Icons.payment,
+                        title: 'Paiements',
+                        subtitle: paymentsSubtitle,
+                        badgeText: unpaidPayments > 0
+                            ? unpaidPayments.toString()
+                            : null,
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/payments'),
+                        color: const Color(AppColors.accent),
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildQuickActionTile(
+                        context,
+                        icon: Icons.build,
+                        title: 'Maintenance',
+                        subtitle: maintenanceSubtitle,
+                        badgeText: pendingMaintenance > 0
+                            ? pendingMaintenance.toString()
+                            : null,
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/maintenance'),
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildQuickActionTile(
+                        context,
+                        icon: Icons.home_work,
+                        title: 'Proprietes',
+                        subtitle: 'Voir les logements',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/properties'),
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -390,56 +398,92 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildQuickActionTile(
+    BuildContext context, {
     required IconData icon,
-    required String label,
+    required String title,
+    required String subtitle,
+    String? badgeText,
     required VoidCallback onPressed,
-    required Color startColor,
-    required Color endColor,
+    required Color color,
   }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppConstants.inputRadius),
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [startColor, endColor],
-          ),
-          borderRadius: BorderRadius.circular(AppConstants.inputRadius),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 12,
-              offset: Offset(0, 6),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              child: Icon(icon, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+    return Material(
+      color: const Color(AppColors.surface),
+      elevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: color),
+                  ),
+                  if (badgeText != null)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.black26),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildUpcomingPayments(List<Payment> payments) {
+  Widget _buildUpcomingPayments(BuildContext context, List<Payment> payments) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -495,13 +539,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
-                Text(
-                  '${payment.amount.toStringAsFixed(0)} FCFA',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                  Text(
+                    '${payment.amount.toStringAsFixed(0)} FCFA',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
                 ],
               ),
             ),
@@ -526,7 +570,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMaintenanceSummary(int pendingCount) {
+  Widget _buildMaintenanceSummary(BuildContext context, int pendingCount) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),

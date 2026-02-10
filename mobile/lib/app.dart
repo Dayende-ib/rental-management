@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:rental_management/auth/auth_service.dart';
 import 'package:rental_management/screens/login_screen.dart';
-import 'package:rental_management/screens/home_screen.dart';
-import 'package:rental_management/screens/payments_screen.dart';
-import 'package:rental_management/screens/maintenance_list_screen.dart';
-import 'package:rental_management/screens/create_maintenance_screen.dart';
-import 'package:rental_management/screens/profile_screen.dart';
 import 'package:rental_management/screens/register_screen.dart';
 import 'package:rental_management/screens/guest_properties_screen.dart';
-import 'package:rental_management/screens/available_properties_screen.dart';
+import 'package:rental_management/screens/maintenance_list_screen.dart';
+import 'package:rental_management/screens/create_maintenance_screen.dart';
+import 'package:rental_management/navigation/main_navigation_screen.dart';
 import 'package:rental_management/core/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -56,19 +53,9 @@ class _RentalAppState extends State<RentalApp> {
           builder: (_) => const GuestPropertiesScreen(),
           settings: settings,
         );
-      case '/properties':
-        return MaterialPageRoute(
-          builder: (_) => const AvailablePropertiesScreen(),
-          settings: settings,
-        );
       case '/home':
         return MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-          settings: settings,
-        );
-      case '/payments':
-        return MaterialPageRoute(
-          builder: (_) => const PaymentsScreen(),
+          builder: (_) => const MainNavigationScreen(),
           settings: settings,
         );
       case '/maintenance':
@@ -79,11 +66,6 @@ class _RentalAppState extends State<RentalApp> {
       case '/create-maintenance':
         return MaterialPageRoute(
           builder: (_) => const CreateMaintenanceScreen(),
-          settings: settings,
-        );
-      case '/profile':
-        return MaterialPageRoute(
-          builder: (_) => const ProfileScreen(),
           settings: settings,
         );
       default:
@@ -195,7 +177,7 @@ class _RentalAppState extends State<RentalApp> {
         ),
       ),
       home: _authService.isAuthenticated()
-          ? const HomeScreen()
+          ? const MainNavigationScreen()
           : const LoginScreen(),
       onGenerateRoute: _onGenerateRoute,
     );
