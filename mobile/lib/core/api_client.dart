@@ -10,7 +10,9 @@ import 'storage.dart';
 /// Manages authentication headers and common API operations
 class ApiClient {
   final http.Client _client = http.Client();
-  
+  static bool _isRefreshing = false;
+  static Completer<bool>? _refreshCompleter;
+
   /// Get authorization header with JWT token
   Map<String, String> get _authHeaders {
     final token = StorageService.getToken();
@@ -43,13 +45,13 @@ class ApiClient {
       try {
         final body = json.decode(response.body);
         if (body is Map<String, dynamic>) {
-          message = body['error']?.toString() ?? body['message']?.toString() ?? message;
+          message =
+              body['error']?.toString() ??
+              body['message']?.toString() ??
+              message;
         }
       } catch (_) {}
-      throw ApiException(
-        message, 
-        response.statusCode
-      );
+      throw ApiException(message, response.statusCode);
     }
   }
 
@@ -59,28 +61,42 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
   }) async {
-    final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
-    final headers = requiresAuth ? _authHeaders : <String, String>{'Content-Type': 'application/json'};
-    
     try {
-      final response = await _client.post(
-        url,
-        headers: headers,
-        body: body != null ? json.encode(body) : null,
-      ).timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
-      
-      final data = await _handleResponse(response);
-      if (data is Map<String, dynamic>) {
-        return data;
+      return await _performPost(endpoint, body, requiresAuth);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 && requiresAuth) {
+        final refreshed = await _refreshSession();
+        if (refreshed) {
+          return await _performPost(endpoint, body, requiresAuth);
+        }
       }
-      throw ApiException('Unexpected response format', response.statusCode);
-    } on SocketException {
-      throw ApiException('No internet connection', 0);
-    } on TimeoutException {
-      throw ApiException('Request timeout', 0);
-    } catch (e) {
-      throw ApiException('Network error: $e', 0);
+      rethrow;
     }
+  }
+
+  Future<Map<String, dynamic>> _performPost(
+    String endpoint,
+    Map<String, dynamic>? body,
+    bool requiresAuth,
+  ) async {
+    final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
+    final headers = requiresAuth
+        ? _authHeaders
+        : <String, String>{'Content-Type': 'application/json'};
+
+    final response = await _client
+        .post(
+          url,
+          headers: headers,
+          body: body != null ? json.encode(body) : null,
+        )
+        .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
+
+    final data = await _handleResponse(response);
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    throw ApiException('Unexpected response format', response.statusCode);
   }
 
   /// GET request with authentication
@@ -88,27 +104,35 @@ class ApiClient {
     String endpoint, {
     bool requiresAuth = true,
   }) async {
+    try {
+      return await _performGet(endpoint, requiresAuth);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 && requiresAuth) {
+        final refreshed = await _refreshSession();
+        if (refreshed) {
+          return await _performGet(endpoint, requiresAuth);
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _performGet(
+    String endpoint,
+    bool requiresAuth,
+  ) async {
     final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
     final headers = requiresAuth ? _authHeaders : <String, String>{};
-    
-    try {
-      final response = await _client.get(
-        url,
-        headers: headers,
-      ).timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
-      
-      final data = await _handleResponse(response);
-      if (data is Map<String, dynamic>) {
-        return data;
-      }
-      throw ApiException('Unexpected response format', response.statusCode);
-    } on SocketException {
-      throw ApiException('No internet connection', 0);
-    } on TimeoutException {
-      throw ApiException('Request timeout', 0);
-    } catch (e) {
-      throw ApiException('Network error: $e', 0);
+
+    final response = await _client
+        .get(url, headers: headers)
+        .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
+
+    final data = await _handleResponse(response);
+    if (data is Map<String, dynamic>) {
+      return data;
     }
+    throw ApiException('Unexpected response format', response.statusCode);
   }
 
   /// PUT request with authentication
@@ -118,8 +142,9 @@ class ApiClient {
     bool requiresAuth = true,
   }) async {
     final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
-    final headers =
-        requiresAuth ? _authHeaders : <String, String>{'Content-Type': 'application/json'};
+    final headers = requiresAuth
+        ? _authHeaders
+        : <String, String>{'Content-Type': 'application/json'};
 
     try {
       final response = await _client
@@ -153,10 +178,9 @@ class ApiClient {
     final headers = requiresAuth ? _authHeaders : <String, String>{};
 
     try {
-      final response = await _client.get(
-        url,
-        headers: headers,
-      ).timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
+      final response = await _client
+          .get(url, headers: headers)
+          .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
 
       final data = await _handleResponse(response);
       if (data is List<dynamic>) {
@@ -200,8 +224,8 @@ class ApiClient {
       );
 
       final streamed = await request.send().timeout(
-            Duration(seconds: AppConstants.apiTimeoutSeconds),
-          );
+        Duration(seconds: AppConstants.apiTimeoutSeconds),
+      );
       final response = await http.Response.fromStream(streamed);
       final data = await _handleResponse(response);
       if (data is Map<String, dynamic>) {
@@ -214,6 +238,58 @@ class ApiClient {
       throw ApiException('Request timeout', 0);
     } catch (e) {
       throw ApiException('Network error: $e', 0);
+    }
+  }
+
+  /// Session refresh logic
+  Future<bool> _refreshSession() async {
+    if (_isRefreshing) {
+      return _refreshCompleter?.future ?? Future.value(false);
+    }
+
+    _isRefreshing = true;
+    _refreshCompleter = Completer<bool>();
+
+    try {
+      final refreshToken = StorageService.getRefreshToken();
+      if (refreshToken == null) {
+        _refreshCompleter!.complete(false);
+        return false;
+      }
+
+      final url = Uri.parse(
+        '${AppConstants.baseUrl}${AppConstants.refreshEndpoint}',
+      );
+      final response = await _client
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'refresh_token': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final session = data['session'];
+        if (session != null) {
+          await StorageService.saveToken(session['access_token']);
+          await StorageService.saveRefreshToken(session['refresh_token']);
+          // Optional: update login date to extend another 30 days from now
+          await StorageService.saveLoginDate();
+          _refreshCompleter!.complete(true);
+          return true;
+        }
+      }
+
+      // Token refresh failed, likely refresh token expired or revoked
+      await StorageService.removeToken();
+      _refreshCompleter!.complete(false);
+      return false;
+    } catch (e) {
+      _refreshCompleter!.complete(false);
+      return false;
+    } finally {
+      _isRefreshing = false;
     }
   }
 

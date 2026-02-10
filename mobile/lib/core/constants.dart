@@ -40,6 +40,7 @@ class AppConstants {
   static const String loginEndpoint = '/auth/login';
   static const String registerEndpoint = '/auth/register';
   static const String logoutEndpoint = '/auth/logout';
+  static const String refreshEndpoint = '/auth/refresh-session';
   static const String profileEndpoint = '/auth/profile';
   static const String tenantProfileEndpoint = '/tenants/me';
   static const String paymentsEndpoint = '/payments';
@@ -49,8 +50,10 @@ class AppConstants {
 
   // Storage Keys
   static const String tokenKey = 'jwt_token';
+  static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
   static const String customBaseUrlKey = 'custom_base_url';
+  static const String lastLoginKey = 'last_login_date';
 
   // App Configuration
   static const String appName = 'Rental Management';

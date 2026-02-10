@@ -29,9 +29,11 @@ const supabase = require('../config/supabase');
 
 const getMaintenanceRequests = async (req, res, next) => {
     try {
+        const userId = req.user.id;
         const { data, error } = await supabase
             .from('maintenance_requests')
-            .select('*, properties(title)');
+            .select('*, properties(title)')
+            .eq('tenant_id', userId);
 
         if (error) throw error;
         res.status(200).json(data);

@@ -15,10 +15,7 @@ class AuthService {
       final normalizedEmail = email.trim().toLowerCase();
       final response = await _apiClient.post(
         AppConstants.loginEndpoint,
-        body: {
-          'email': normalizedEmail,
-          'password': password,
-        },
+        body: {'email': normalizedEmail, 'password': password},
         requiresAuth: false,
       );
 
@@ -28,6 +25,13 @@ class AuthService {
       }
 
       await StorageService.saveToken(token);
+      await StorageService.saveLoginDate();
+
+      final refreshToken = _extractRefreshToken(response);
+      if (refreshToken != null) {
+        await StorageService.saveRefreshToken(refreshToken);
+      }
+
       final userId = _extractUserId(response);
       if (userId != null && userId.isNotEmpty) {
         await StorageService.saveUserId(userId);
@@ -49,13 +53,20 @@ class AuthService {
           'email': normalizedEmail,
           'password': password,
           'full_name': fullName,
-          'role': 'staff',
+          'role': 'tenant',
         },
         requiresAuth: false,
       );
       final token = _extractToken(response);
       if (token != null && token.isNotEmpty) {
         await StorageService.saveToken(token);
+        await StorageService.saveLoginDate();
+
+        final refreshToken = _extractRefreshToken(response);
+        if (refreshToken != null) {
+          await StorageService.saveRefreshToken(refreshToken);
+        }
+
         final userId = _extractUserId(response);
         if (userId != null && userId.isNotEmpty) {
           await StorageService.saveUserId(userId);
@@ -123,6 +134,15 @@ class AuthService {
       if (token is String && token.isNotEmpty) return token;
     }
     return null;
+  }
+
+  String? _extractRefreshToken(Map<String, dynamic> data) {
+    final session = data['session'];
+    if (session is Map<String, dynamic>) {
+      final token = session['refresh_token'] ?? session['refreshToken'];
+      if (token is String && token.isNotEmpty) return token;
+    }
+    return data['refresh_token'] ?? data['refreshToken'];
   }
 
   String? _extractUserId(Map<String, dynamic> data) {

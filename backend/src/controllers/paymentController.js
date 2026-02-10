@@ -30,9 +30,11 @@ const supabase = require('../config/supabase');
 
 const getPayments = async (req, res, next) => {
     try {
+        const userId = req.user.id;
         const { data, error } = await supabase
             .from('payments')
-            .select('*, contracts(id, tenant_id)');
+            .select('*, contracts!inner(id, tenant_id)')
+            .eq('contracts.tenant_id', userId);
 
         if (error) throw error;
         res.status(200).json(data);

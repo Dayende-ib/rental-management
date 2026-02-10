@@ -48,7 +48,7 @@ const register = async (req, res, next) => {
                     {
                         id: authData.user.id,
                         full_name,
-                        role: role || 'staff',
+                        role: role || 'tenant',
                     }
                 ]);
 
@@ -131,12 +131,33 @@ const updateProfile = async (req, res, next) => {
     }
 };
 
+const refreshSession = async (req, res, next) => {
+    try {
+        const { refresh_token } = req.body;
+        if (!refresh_token) {
+            return res.status(400).json({ error: 'Refresh token is required' });
+        }
+
+        const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+
+        if (error) {
+            error.status = 401;
+            throw error;
+        }
+
+        res.status(200).json(data);
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     register,
     login,
     logout,
     getProfile,
     updateProfile,
+    refreshSession,
 };
 
 function normalizeEmail(value) {

@@ -71,6 +71,7 @@ router.post('/register', authController.register);
  *         description: Unauthorized
  */
 router.post('/login', authController.login);
+router.post('/refresh-session', authController.refreshSession);
 
 /**
  * @swagger

@@ -23,12 +23,42 @@ class StorageService {
 
   /// Remove JWT token from local storage (logout)
   static Future<bool> removeToken() async {
+    await _prefs.remove(AppConstants.refreshTokenKey);
     return await _prefs.remove(AppConstants.tokenKey);
   }
 
-  /// Check if user is logged in
+  /// Save refresh token
+  static Future<bool> saveRefreshToken(String token) async {
+    return await _prefs.setString(AppConstants.refreshTokenKey, token);
+  }
+
+  /// Get refresh token
+  static String? getRefreshToken() {
+    return _prefs.getString(AppConstants.refreshTokenKey);
+  }
+
+  /// Check if user is logged in and session is within 30 days
   static bool isLoggedIn() {
-    return getToken() != null;
+    final token = getToken();
+    if (token == null || token.isEmpty) return false;
+
+    final loginDateStr = _prefs.getString(AppConstants.lastLoginKey);
+    if (loginDateStr == null) return false;
+
+    final loginDate = DateTime.tryParse(loginDateStr);
+    if (loginDate == null) return false;
+
+    // Check if session is older than 30 days
+    final difference = DateTime.now().difference(loginDate).inDays;
+    return difference < 30;
+  }
+
+  /// Save current login date
+  static Future<bool> saveLoginDate() async {
+    return await _prefs.setString(
+      AppConstants.lastLoginKey,
+      DateTime.now().toIso8601String(),
+    );
   }
 
   /// Save user ID to local storage

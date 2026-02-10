@@ -52,7 +52,8 @@ const getProperties = async (req, res, next) => {
     try {
         const { data, error } = await supabase
             .from('properties')
-            .select('*');
+            .select('*')
+            .eq('status', 'available');
 
         if (error) throw error;
         res.status(200).json(data);

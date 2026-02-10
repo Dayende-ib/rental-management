@@ -42,8 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       if (success) {
-        // Navigate to home screen
-        Navigator.pushReplacementNamed(context, '/home');
+        // Navigate to home screen and destroy navigation stack
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       } else {
         setState(() {
           _errorMessage = 'Identifiants invalides';
