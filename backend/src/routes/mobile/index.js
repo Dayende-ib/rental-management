@@ -6,6 +6,7 @@ const contractController = require('../../controllers/contractController');
 const paymentController = require('../../controllers/paymentController');
 const maintenanceController = require('../../controllers/maintenanceController');
 const authMiddleware = require('../../middlewares/auth');
+const optionalAuth = require('../../middlewares/optionalAuth');
 const roleCheck = require('../../middlewares/roleCheck');
 
 // Roles autorisés pour le mobile (tenant)
@@ -14,13 +15,16 @@ const tenantRole = ['tenant'];
 // Profiles / Me
 router.get('/me', authMiddleware, roleCheck(tenantRole), tenantController.getCurrentTenant);
 
-// Properties (View Only)
-router.get('/properties', authMiddleware, roleCheck(tenantRole), propertyController.getProperties);
-router.get('/properties/:id', authMiddleware, roleCheck(tenantRole), propertyController.getPropertyById);
+// Properties (View Only - Public/Guest allowed)
+router.get('/properties', optionalAuth, propertyController.getProperties);
+router.get('/properties/:id', optionalAuth, propertyController.getPropertyById);
 
-// Contracts (View Only - Own contracts)
+// Contracts (View & Manage)
 router.get('/contracts', authMiddleware, roleCheck(tenantRole), contractController.getContracts);
 router.get('/contracts/:id', authMiddleware, roleCheck(tenantRole), contractController.getContractById);
+router.post('/contracts', authMiddleware, roleCheck(tenantRole), contractController.createContractRequest);
+router.post('/contracts/:id/accept', authMiddleware, roleCheck(tenantRole), contractController.acceptContract);
+router.post('/contracts/:id/reject', authMiddleware, roleCheck(tenantRole), contractController.rejectContract);
 
 // Payments (View & Pay)
 router.get('/payments', authMiddleware, roleCheck(tenantRole), paymentController.getPayments);

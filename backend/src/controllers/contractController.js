@@ -163,10 +163,126 @@ const deleteContract = async (req, res, next) => {
     }
 };
 
+const createContractRequest = async (req, res, next) => {
+    try {
+        const { property_id, start_date, duration_months } = req.body;
+        const userClient = createUserClient(req.token);
+        const userId = req.user.id;
+
+        // 1. Get Tenant ID
+        const { data: tenant, error: tenantError } = await userClient
+            .from('tenants')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (tenantError) throw tenantError;
+        if (!tenant) return res.status(404).json({ error: 'Tenant profile not found. Please complete your profile first.' });
+
+        // 2. Get Property Details
+        const { data: property, error: propertyError } = await userClient
+            .from('properties')
+            .select('price, charges, status')
+            .eq('id', property_id)
+            .maybeSingle();
+
+        if (propertyError) throw propertyError;
+        if (!property) return res.status(404).json({ error: 'Property not found' });
+        if (property.status !== 'available') return res.status(400).json({ error: 'Property is not available' });
+
+        // 3. Create Draft Contract
+        const { data: contract, error: contractError } = await userClient
+            .from('contracts')
+            .insert([{
+                property_id,
+                tenant_id: tenant.id,
+                start_date: start_date || new Date().toISOString(),
+                duration_months: duration_months || 12,
+                monthly_rent: property.price,
+                charges: property.charges || 0,
+                status: 'draft',
+                signed_by_tenant: false,
+                signed_by_landlord: false
+            }])
+            .select();
+
+        if (contractError) throw contractError;
+
+        res.status(201).json(contract[0]);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const acceptContract = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const userClient = createUserClient(req.token);
+
+        // 1. Get Contract
+        const { data: contract, error: fetchError } = await userClient
+            .from('contracts')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (contract.status !== 'draft') return res.status(400).json({ error: 'Contract is not in draft state' });
+
+        // 2. Update Contract (Sign & Activate)
+        // Note: For MVP we assume acting as landlord automatically validates it
+        const { data: updatedContract, error: updateError } = await userClient
+            .from('contracts')
+            .update({
+                status: 'active',
+                signed_by_tenant: true,
+                signed_by_landlord: true, // Auto-sign for MVP
+                signed_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+
+        if (updateError) throw updateError;
+
+        // 3. Update Property Status
+        await userClient
+            .from('properties')
+            .update({ status: 'rented' })
+            .eq('id', contract.property_id);
+
+        res.status(200).json(updatedContract[0]);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const rejectContract = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const userClient = createUserClient(req.token);
+
+        // Delete the draft contract
+        const { error } = await userClient
+            .from('contracts')
+            .delete()
+            .eq('id', id)
+            .eq('status', 'draft'); // Security check
+
+        if (error) throw error;
+
+        res.status(204).send();
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getContracts,
     getContractById,
     createContract,
     updateContract,
     deleteContract,
+    createContractRequest,
+    acceptContract,
+    rejectContract,
 };

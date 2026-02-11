@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../screens/home_screen.dart';
+import '../screens/available_properties_screen.dart';
 import '../screens/payments_screen.dart';
 import '../screens/maintenance_list_screen.dart';
 import '../screens/profile_screen.dart';
@@ -16,6 +17,7 @@ class MainNavigationScreen extends ConsumerWidget {
 
   static const List<Widget> _screens = [
     HomeScreen(),
+    AvailablePropertiesScreen(),
     PaymentsScreen(),
     MaintenanceListScreen(),
     ProfileScreen(),
@@ -43,6 +45,7 @@ class MainNavigationScreen extends ConsumerWidget {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Louer'),
           BottomNavigationBarItem(
             icon: Icon(Icons.payment),
             label: 'Paiements',
