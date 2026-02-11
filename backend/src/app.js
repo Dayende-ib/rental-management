@@ -42,6 +42,9 @@ app.use('/api/web', require('./routes/web/index'));
 // Mobile Routes (Tenant)
 app.use('/api/mobile', require('./routes/mobile/index'));
 
+// Cron Routes (Internal/Scheduled Tasks)
+app.use('/api/cron', require('./routes/cronRoutes'));
+
 // Legacy/Shared Routes (au cas où, mais idéalement à migrer)
 // app.use('/api/properties', require('./routes/propertyRoutes'));
 // app.use('/api/tenants', require('./routes/tenantRoutes'));

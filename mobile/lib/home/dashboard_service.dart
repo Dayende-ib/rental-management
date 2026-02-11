@@ -10,22 +10,27 @@ class DashboardService {
   Future<DashboardData> getDashboardData() async {
     try {
       final tenant = await _fetchTenant();
-      final contracts = await _apiClient.getList(AppConstants.contractsEndpoint);
+      final contracts = await _apiClient.getList(
+        AppConstants.contractsEndpoint,
+      );
       final contract = _findContractForTenant(contracts, tenant.id);
 
       final property = await _fetchProperty(contract);
-      final payments =
-          await _fetchPayments(contractId: contract?['id']?.toString());
+      final payments = await _fetchPayments(
+        contractId: contract?['id']?.toString(),
+      );
       final maintenance = await _fetchMaintenance(
         propertyId: property.id.isEmpty ? null : property.id,
       );
 
       payments.sort((a, b) => a.dueDate.compareTo(b.dueDate));
       final pendingMaintenanceRequests = maintenance
-          .where((r) =>
-              r.status == 'pending' ||
-              r.status == 'reported' ||
-              r.status == 'in_progress')
+          .where(
+            (r) =>
+                r.status == 'pending' ||
+                r.status == 'reported' ||
+                r.status == 'in_progress',
+          )
           .length;
 
       return DashboardData(
@@ -66,10 +71,13 @@ class DashboardService {
   Future<Property> _fetchProperty(Map<String, dynamic>? contract) async {
     if (contract != null && contract['property_id'] != null) {
       final propertyId = contract['property_id'].toString();
-      final data =
-          await _apiClient.get('${AppConstants.propertiesEndpoint}/$propertyId');
+      final data = await _apiClient.get(
+        '${AppConstants.propertiesEndpoint}/$propertyId',
+      );
       final property = Property.fromJson(data);
-      final rent = _toDouble(contract['monthly_rent'] ?? contract['monthlyRent']);
+      final rent = _toDouble(
+        contract['monthly_rent'] ?? contract['monthlyRent'],
+      );
       if (rent > 0 && property.monthlyRent == 0) {
         return Property(
           id: property.id,
@@ -86,10 +94,8 @@ class DashboardService {
       return property;
     }
 
-    final properties = await _apiClient.getList(AppConstants.propertiesEndpoint);
-    if (properties.isNotEmpty && properties.first is Map<String, dynamic>) {
-      return Property.fromJson(properties.first as Map<String, dynamic>);
-    }
+    // If no contract is found, do NOT fetch random properties.
+    // Return an empty property so the dashboard shows "No property" state.
     return Property(
       id: '',
       title: '',
@@ -117,7 +123,9 @@ class DashboardService {
     return payments;
   }
 
-  Future<List<MaintenanceRequest>> _fetchMaintenance({String? propertyId}) async {
+  Future<List<MaintenanceRequest>> _fetchMaintenance({
+    String? propertyId,
+  }) async {
     final data = await _apiClient.getList(AppConstants.maintenanceEndpoint);
     final requests = <MaintenanceRequest>[];
     for (final item in data) {

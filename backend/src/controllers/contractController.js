@@ -230,14 +230,18 @@ const acceptContract = async (req, res, next) => {
         if (contract.status !== 'draft') return res.status(400).json({ error: 'Contract is not in draft state' });
 
         // 2. Update Contract (Sign & Activate)
-        // Note: For MVP we assume acting as landlord automatically validates it
+        // Set payment_day to 1 and grace_period to 5 as per rules
+        const now = new Date();
         const { data: updatedContract, error: updateError } = await userClient
             .from('contracts')
             .update({
                 status: 'active',
                 signed_by_tenant: true,
                 signed_by_landlord: true, // Auto-sign for MVP
-                signed_at: new Date().toISOString()
+                signed_at: now.toISOString(),
+                start_date: now.toISOString(),
+                payment_day: 1,
+                grace_period_days: 5
             })
             .eq('id', id)
             .select();
@@ -249,6 +253,20 @@ const acceptContract = async (req, res, next) => {
             .from('properties')
             .update({ status: 'rented' })
             .eq('id', contract.property_id);
+
+        // 4. Create Initial Payment (Immediate)
+        const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+        const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+        await userClient
+            .from('payments')
+            .insert([{
+                contract_id: id,
+                month: formattedMonth,
+                amount: contract.monthly_rent + (contract.charges || 0),
+                due_date: now.toISOString(),
+                status: 'pending'
+            }]);
 
         res.status(200).json(updatedContract[0]);
     } catch (err) {

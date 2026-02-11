@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/providers/dashboard_providers.dart';
 import '../core/providers/payment_providers.dart';
 import '../widgets/stat_charts.dart';
+import '../navigation/main_navigation_screen.dart';
 
 /// Home/Dashboard screen showing tenant overview
 class HomeScreen extends ConsumerWidget {
@@ -32,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 12),
-                    _buildPropertyCard(context, dashboardData.property),
+                    _buildPropertyCard(context, ref, dashboardData.property),
                     const SizedBox(height: 24),
 
                     // Graphique des paiements
@@ -234,7 +235,50 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPropertyCard(BuildContext context, Property property) {
+  Widget _buildPropertyCard(
+    BuildContext context,
+    WidgetRef ref,
+    Property property,
+  ) {
+    if (property.id.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: EdgeInsets.all(AppConstants.defaultPadding),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.home_work_outlined,
+                size: 48,
+                color: Color(AppColors.textMuted),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Aucun logement actif',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Vous n\'avez pas encore de contrat de location actif.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(AppColors.textSecondary)),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Switch to 'Louer' tab (index 1)
+                    ref.read(navigationIndexProvider.notifier).state = 1;
+                  },
+                  child: const Text('Trouver un logement'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -397,18 +441,6 @@ class HomeScreen extends ConsumerWidget {
                         color: Colors.orange.shade700,
                       ),
                     ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: _buildQuickActionTile(
-                        context,
-                        icon: Icons.home_work,
-                        title: 'Proprietes',
-                        subtitle: 'Voir les logements',
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/properties'),
-                        color: Colors.indigo.shade700,
-                      ),
-                    ),
                   ],
                 );
               },
@@ -534,6 +566,8 @@ class HomeScreen extends ConsumerWidget {
     final Color paidText = const Color(AppColors.accent);
     final Color dueBg = Colors.orange.shade100;
     final Color dueText = Colors.orange.shade800;
+    final Color overdueBg = Colors.red.shade100;
+    final Color overdueText = Colors.red.shade800;
 
     return Card(
       color: const Color(AppColors.surface),
@@ -561,7 +595,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${payment.amount.toStringAsFixed(0)} FCFA',
+                    '${(payment.amount + payment.lateFee).toStringAsFixed(0)} FCFA',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -574,13 +608,19 @@ class HomeScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: payment.isPaid ? paidBg : dueBg,
+                color: payment.isPaid
+                    ? paidBg
+                    : (payment.isOverdue ? overdueBg : dueBg),
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Text(
-                payment.isPaid ? 'Payé' : 'À payer',
+                payment.isPaid
+                    ? 'Payé'
+                    : (payment.isOverdue ? 'En retard' : 'À payer'),
                 style: TextStyle(
-                  color: payment.isPaid ? paidText : dueText,
+                  color: payment.isPaid
+                      ? paidText
+                      : (payment.isOverdue ? overdueText : dueText),
                   fontWeight: FontWeight.w700,
                 ),
               ),

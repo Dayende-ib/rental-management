@@ -25,22 +25,12 @@ class Tenant {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'email': email,
-      'phone': phone,
-    };
+    return {'id': id, 'name': name, 'email': email, 'phone': phone};
   }
 
   /// Empty tenant instance for offline use
   factory Tenant.empty() {
-    return Tenant(
-      id: '',
-      name: '',
-      email: '',
-      phone: '',
-    );
+    return Tenant(id: '', name: '', email: '', phone: '');
   }
 }
 
@@ -118,7 +108,9 @@ class Payment {
   final String status; // 'paid' or 'unpaid'
   final DateTime dueDate;
   final DateTime? paidDate;
-  final String validationStatus; // 'not_submitted', 'pending', 'validated', 'rejected'
+  final String
+  validationStatus; // 'not_submitted', 'pending', 'validated', 'rejected'
+  final double lateFee;
 
   Payment({
     required this.id,
@@ -130,10 +122,12 @@ class Payment {
     required this.dueDate,
     this.paidDate,
     this.validationStatus = 'validated',
+    this.lateFee = 0.0,
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) {
-    final dueDate = _parseDate(
+    final dueDate =
+        _parseDate(
           json['dueDate'] ??
               json['due_date'] ??
               json['payment_date'] ??
@@ -142,13 +136,14 @@ class Payment {
         ) ??
         DateTime.now();
     final status = (json['status'] ?? 'pending').toString();
-    final paidDate = _parseDate(json['paidDate'] ?? json['paid_date']) ??
+    final paidDate =
+        _parseDate(json['paidDate'] ?? json['paid_date']) ??
         (status == 'paid' ? dueDate : null);
     final month = (json['month'] ?? '').toString().isNotEmpty
         ? json['month'].toString()
         : _formatMonth(dueDate);
-    final validation =
-        (json['validationStatus'] ?? json['validation_status'])?.toString();
+    final validation = (json['validationStatus'] ?? json['validation_status'])
+        ?.toString();
 
     return Payment(
       id: json['id'] as String,
@@ -160,10 +155,12 @@ class Payment {
       dueDate: dueDate,
       paidDate: paidDate,
       validationStatus: validation ?? _mapValidationFromStatus(status),
+      lateFee: _parseDouble(json['late_fee']),
     );
   }
 
   bool get isPaid => status == 'paid';
+  bool get isOverdue => status == 'overdue';
   bool get isPendingValidation => validationStatus == 'pending';
   bool get isRejected => validationStatus == 'rejected';
   bool get isValidated => validationStatus == 'validated';
@@ -179,6 +176,7 @@ class Payment {
       status: '',
       dueDate: DateTime.now(),
       validationStatus: '',
+      lateFee: 0.0,
     );
   }
 }
@@ -210,16 +208,12 @@ class MaintenanceRequest {
       description: json['description'] as String,
       status: json['status'] as String,
       urgency: (json['urgency'] ?? 'normal').toString(),
-      createdAt: _parseDate(
-            json['createdAt'] ??
-                json['created_at'] ??
-                json['request_date'],
+      createdAt:
+          _parseDate(
+            json['createdAt'] ?? json['created_at'] ?? json['request_date'],
           ) ??
           DateTime.now(),
-      updatedAt: _parseDate(
-            json['updatedAt'] ??
-                json['updated_at'],
-          ),
+      updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
     );
   }
 
@@ -314,11 +308,11 @@ String _mapValidationFromStatus(String status) {
       return 'validated';
     case 'pending':
       return 'pending';
-    case 'failed':
     case 'overdue':
+      return 'not_submitted'; // Overdue just means late, not that valid was rejected
+    case 'failed':
       return 'rejected';
     default:
       return 'not_submitted';
   }
 }
-

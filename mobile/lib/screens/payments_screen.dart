@@ -160,6 +160,10 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       badgeColor = Colors.red.shade100;
       badgeTextColor = Colors.red.shade800;
       badgeText = 'Refusé';
+    } else if (payment.isOverdue) {
+      badgeColor = Colors.red.shade100;
+      badgeTextColor = Colors.red.shade900;
+      badgeText = 'En retard';
     } else {
       badgeColor = Colors.grey.shade200;
       badgeTextColor = Colors.grey.shade700;
@@ -213,13 +217,32 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              '${payment.amount.toStringAsFixed(0)} FCFA',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(AppColors.accent),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${(payment.amount + payment.lateFee).toStringAsFixed(0)} FCFA',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(AppColors.accent),
+                  ),
+                ),
+                if (payment.lateFee > 0) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '(dont ${payment.lateFee.toStringAsFixed(0)} pénalité)',
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 16),
             SizedBox(

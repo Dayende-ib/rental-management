@@ -57,10 +57,13 @@ final paymentStatsProvider = Provider<PaymentStats>((ref) {
     data: (payments) {
       final unpaid = payments.where((p) => !p.isPaid).length;
       final pending = payments.where((p) => p.isPendingValidation).length;
-      final total = payments.fold<double>(0, (sum, p) => sum + p.amount);
+      final total = payments.fold<double>(
+        0,
+        (sum, p) => sum + p.amount + p.lateFee,
+      );
       final paid = payments.fold<double>(
         0,
-        (sum, p) => sum + (p.isPaid ? p.amount : 0),
+        (sum, p) => sum + (p.isPaid ? p.amount + p.lateFee : 0),
       );
 
       return PaymentStats(
