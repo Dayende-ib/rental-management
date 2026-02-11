@@ -19,6 +19,8 @@ class AvailablePropertyItem {
   bool get isAvailable => status.isEmpty || status == 'available';
 }
 
+enum PropertyViewMode { available, mine }
+
 /// Authenticated view listing available properties
 class AvailablePropertiesScreen extends StatefulWidget {
   const AvailablePropertiesScreen({super.key});
@@ -31,34 +33,136 @@ class AvailablePropertiesScreen extends StatefulWidget {
 class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   final ApiClient _apiClient = ApiClient();
   late Future<List<AvailablePropertyItem>> _propertiesFuture;
+  PropertyViewMode _viewMode = PropertyViewMode.available;
+  String _currentUserRole = '';
+  String _currentUserId = '';
+  int _availableCount = 0;
+  int _mineCount = 0;
 
   @override
   void initState() {
     super.initState();
     _propertiesFuture = _loadProperties();
+    _initializeUserContext();
+    _refreshCounts();
+  }
+
+  bool get _canUseOwnerView =>
+      _currentUserRole == 'admin' || _currentUserRole == 'manager';
+  bool get _canUseMineView => _currentUserRole == 'tenant' || _canUseOwnerView;
+
+  Future<void> _initializeUserContext() async {
+    try {
+      final profile = await _apiClient.get(AppConstants.profileEndpoint);
+      final role = (profile['role'] ?? '').toString();
+      final userId = (profile['id'] ?? '').toString();
+      if (!mounted) return;
+      setState(() {
+        _currentUserRole = role;
+        _currentUserId = userId;
+        _propertiesFuture = _loadProperties();
+      });
+      await _refreshCounts();
+    } catch (_) {
+      // Ignore: guest context keeps default available view.
+    }
   }
 
   Future<List<AvailablePropertyItem>> _loadProperties() async {
-    final data = await _apiClient.getList(AppConstants.propertiesEndpoint);
+    final endpoint = _buildPropertiesEndpoint();
+    final data = await _apiClient.getList(endpoint);
+    return _toPropertyItems(data, mode: _viewMode);
+  }
+
+  List<AvailablePropertyItem> _toPropertyItems(
+    List<dynamic> data, {
+    required PropertyViewMode mode,
+    bool applyOwnerFilter = true,
+  }) {
     final properties = <AvailablePropertyItem>[];
     for (final item in data) {
-      if (item is Map<String, dynamic>) {
-        final status = (item['status'] ?? '').toString();
-        if (status.isNotEmpty && status != 'available') {
+      if (item is! Map<String, dynamic>) continue;
+      final status = (item['status'] ?? '').toString();
+      if (mode == PropertyViewMode.available &&
+          status.isNotEmpty &&
+          status != 'available') {
+        continue;
+      }
+      if (mode == PropertyViewMode.mine &&
+          applyOwnerFilter &&
+          _canUseOwnerView) {
+        final ownerId = (item['owner_id'] ?? '').toString();
+        if (ownerId.isEmpty || ownerId != _currentUserId) {
           continue;
         }
-        final property = Property.fromJson(item);
-        properties.add(
-          AvailablePropertyItem(
-            property: property,
-            status: status,
-            type: (item['type'] ?? '').toString(),
-            description: (item['description'] ?? '').toString(),
-          ),
-        );
       }
+
+      properties.add(
+        AvailablePropertyItem(
+          property: Property.fromJson(item),
+          status: status,
+          type: (item['type'] ?? '').toString(),
+          description: (item['description'] ?? '').toString(),
+        ),
+      );
     }
     return properties;
+  }
+
+  String _buildPropertiesEndpoint() {
+    if (_viewMode == PropertyViewMode.mine && _currentUserRole == 'tenant') {
+      return '${AppConstants.propertiesEndpoint}?scope=mine';
+    }
+    return AppConstants.propertiesEndpoint;
+  }
+
+  Future<void> _refreshCounts() async {
+    try {
+      int availableCount = 0;
+      int mineCount = 0;
+
+      if (_currentUserRole == 'tenant') {
+        final availableData = await _apiClient.getList(
+          AppConstants.propertiesEndpoint,
+        );
+        availableCount = _toPropertyItems(
+          availableData,
+          mode: PropertyViewMode.available,
+          applyOwnerFilter: false,
+        ).length;
+
+        final mineData = await _apiClient.getList(
+          '${AppConstants.propertiesEndpoint}?scope=mine',
+        );
+        mineCount = _toPropertyItems(
+          mineData,
+          mode: PropertyViewMode.mine,
+          applyOwnerFilter: false,
+        ).length;
+      } else if (_canUseOwnerView) {
+        final data = await _apiClient.getList(AppConstants.propertiesEndpoint);
+        availableCount = _toPropertyItems(
+          data,
+          mode: PropertyViewMode.available,
+        ).length;
+        mineCount = _toPropertyItems(data, mode: PropertyViewMode.mine).length;
+      } else {
+        final data = await _apiClient.getList(AppConstants.propertiesEndpoint);
+        availableCount = _toPropertyItems(
+          data,
+          mode: PropertyViewMode.available,
+          applyOwnerFilter: false,
+        ).length;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _availableCount = availableCount;
+        _mineCount = mineCount;
+      });
+    } catch (_) {
+      // Ignore counts refresh failures.
+    }
   }
 
   Future<void> _refresh() async {
@@ -66,6 +170,7 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
       _propertiesFuture = _loadProperties();
     });
     await _propertiesFuture;
+    await _refreshCounts();
   }
 
   Future<void> _requestRental(BuildContext context, Property property) async {
@@ -76,22 +181,19 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
         builder: (c) => const Center(child: CircularProgressIndicator()),
       );
 
-      // 1. Create Contract Request
       final response = await _apiClient.post(
         AppConstants.contractsEndpoint,
         body: {'property_id': property.id},
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      Navigator.pop(context);
 
       final contractId = response['id'];
-
-      // 2. Show Confirmation Dialog
       _showContractDialog(context, contractId, property);
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Close loading if active
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -117,11 +219,11 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Propriété: ${property.title}'),
+              Text('Propriete: ${property.title}'),
               Text('Loyer: ${property.monthlyRent} FCFA/mois'),
               const SizedBox(height: 16),
               const Text(
-                'En acceptant, vous vous engagez à louer ce bien selon les termes du contrat standard.',
+                'En acceptant, vous vous engagez a louer ce bien selon les termes du contrat standard.',
                 textAlign: TextAlign.justify,
               ),
             ],
@@ -156,11 +258,11 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Félicitations ! Le logement est loué.'),
+          content: Text('Felicitations ! Le logement est loue.'),
           backgroundColor: Colors.green,
         ),
       );
-      _refresh(); // Refresh list (property should disappear or show status)
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,10 +277,9 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
         '${AppConstants.contractsEndpoint}/$contractId/reject',
       );
       if (!mounted) return;
-
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Contrat refusé.')));
+      ).showSnackBar(const SnackBar(content: Text('Contrat refuse.')));
     } catch (e) {
       // Ignore cleanup errors
     }
@@ -187,7 +288,13 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Biens disponibles')),
+      appBar: AppBar(
+        title: Text(
+          _viewMode == PropertyViewMode.available
+              ? 'Biens disponibles'
+              : 'Mes biens',
+        ),
+      ),
       body: FutureBuilder<List<AvailablePropertyItem>>(
         future: _propertiesFuture,
         builder: (context, snapshot) {
@@ -220,6 +327,8 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(AppConstants.defaultPadding),
               children: [
+                if (_canUseMineView) _buildViewSwitch(),
+                if (_canUseMineView) const SizedBox(height: 12),
                 if (properties.isEmpty)
                   _buildEmptyState()
                 else
@@ -243,7 +352,56 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
             color: Color(AppColors.textMuted),
           ),
           const SizedBox(height: 16),
-          const Text('Aucun bien disponible pour le moment'),
+          Text(
+            _viewMode == PropertyViewMode.available
+                ? 'Aucun bien disponible pour le moment'
+                : (_currentUserRole == 'tenant'
+                      ? 'Aucun bien lie a vos contrats actifs'
+                      : 'Aucun bien personnel trouve'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewSwitch() {
+    final isMine = _viewMode == PropertyViewMode.mine;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(AppColors.surface),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Disponibles ($_availableCount)',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Switch(
+            value: isMine,
+            onChanged: (value) {
+              setState(() {
+                _viewMode = value
+                    ? PropertyViewMode.mine
+                    : PropertyViewMode.available;
+                _propertiesFuture = _loadProperties();
+              });
+              _refreshCounts();
+            },
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Mes biens ($_mineCount)',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -251,12 +409,25 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
 
   Widget _buildPropertyCard(AvailablePropertyItem item) {
     final property = item.property;
+    final status = item.status.toLowerCase();
+    String statusLabel;
+    if (status.isEmpty || status == 'available') {
+      statusLabel = 'Disponible';
+    } else if (status == 'rented') {
+      statusLabel = 'Loue';
+    } else if (status == 'maintenance') {
+      statusLabel = 'Maintenance';
+    } else if (status == 'sold') {
+      statusLabel = 'Vendu';
+    } else {
+      statusLabel = item.status;
+    }
     final rentText = property.monthlyRent > 0
         ? '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois'
         : 'Loyer sur demande';
     final location = '${property.postalCode} ${property.city}'.trim();
     final surfaceText = property.surface > 0
-        ? '${property.surface.toStringAsFixed(0)} m²'
+        ? '${property.surface.toStringAsFixed(0)} m2'
         : '';
     final roomsText = property.rooms > 0 ? '${property.rooms} pieces' : '';
 
@@ -305,9 +476,9 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
                     color: const Color(AppColors.accentLight),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    'Disponible',
-                    style: TextStyle(
+                  child: Text(
+                    statusLabel,
+                    style: const TextStyle(
                       color: Color(AppColors.accent),
                       fontWeight: FontWeight.w700,
                     ),
@@ -364,19 +535,21 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
               const SizedBox(height: 8),
               Text(item.description),
             ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _requestRental(context, property),
-                icon: const Icon(Icons.key),
-                label: const Text('Louer ce bien'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(AppColors.accent),
-                  foregroundColor: Colors.white,
+            if (_viewMode == PropertyViewMode.available) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _requestRental(context, property),
+                  icon: const Icon(Icons.key),
+                  label: const Text('Louer ce bien'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(AppColors.accent),
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

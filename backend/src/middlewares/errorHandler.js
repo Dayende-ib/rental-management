@@ -1,8 +1,10 @@
 const errorHandler = (err, req, res, next) => {
+    const requestId = req?.requestId || '-';
+
     if (err.stack) {
-        console.error(err.stack);
+        console.error(`[${requestId}]`, err.stack);
     } else {
-        console.error('Error Object:', JSON.stringify(err, null, 2));
+        console.error(`[${requestId}] Error Object:`, JSON.stringify(err, null, 2));
     }
 
     let status = err.status || 500;
@@ -22,6 +24,7 @@ const errorHandler = (err, req, res, next) => {
         error: {
             message,
             status,
+            request_id: requestId,
         },
     });
 };

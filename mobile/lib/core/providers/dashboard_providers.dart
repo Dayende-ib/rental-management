@@ -10,7 +10,7 @@ final dashboardServiceProvider = Provider<DashboardService>((ref) {
 });
 
 /// Dashboard data provider with offline support
-final dashboardDataProvider = FutureProvider<DashboardData>((ref) async {
+final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
   final dashboardService = ref.watch(dashboardServiceProvider);
   final dbHelper = ref.watch(databaseHelperProvider);
   final connectivityService = ref.watch(connectivityServiceProvider);

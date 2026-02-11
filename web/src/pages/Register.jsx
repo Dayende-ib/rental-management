@@ -208,9 +208,9 @@ export default function ImprovedRegister() {
                 {error && (
                   <div className="p-4 border-2 border-red-200 bg-red-50 rounded-2xl animate-shake">
                     <p className="flex items-center gap-2 text-sm font-medium text-red-800">
-                      <div className="flex items-center justify-center flex-shrink-0 w-5 h-5 bg-red-200 rounded-full">
+                      <span className="flex items-center justify-center flex-shrink-0 w-5 h-5 bg-red-200 rounded-full">
                         <span className="text-xs text-red-600">!</span>
-                      </div>
+                      </span>
                       {error}
                     </p>
                   </div>
@@ -306,6 +306,7 @@ export default function ImprovedRegister() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#1C9B7E] transition-colors"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

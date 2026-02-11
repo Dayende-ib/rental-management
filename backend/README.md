@@ -5,7 +5,7 @@ Robust REST API supporting the rental management ecosystem. Handles authenticati
 ## 🛠 Features
 
 - **Authentication**: JWT-based authentication using **Supabase**.
-- **Role-Based Access Control**: Middleware ensures `admin`, `manager`, `staff` (Web) and `tenant` (Mobile) roles are strictly enforced.
+- **Role-Based Access Control**: Middleware ensures `admin`, `manager` (Web) and `tenant` (Mobile) roles are strictly enforced.
 - **Route Separation**: distinct API endpoints for Web (`/api/web`) and Mobile (`/api/mobile`) to cater to specific needs.
 - **Contract Management**: Tenant-initiated contract requests and approvals (`draft` -> `active`).
 - **Data Integrity**: **PostgreSQL** schema with relational integrity and views for dashboards.
@@ -76,11 +76,23 @@ backend/
 
 ### Base URL: `http://localhost:5000`
 
+### Pagination & tri (P2)
+- Les endpoints de listing acceptent désormais:
+- `page` (>=1), `limit` (max 200), `sort_by`, `sort_order` (`asc`|`desc`)
+- Sans `page`/`limit`, la réponse reste inchangée (tableau brut).
+- Avec pagination, la réponse est:
+  `{ data: [...], meta: { page, limit, total_items, total_pages } }`
+
+### Observabilité (P2)
+- Chaque requête reçoit un `x-request-id` (entrant ou généré).
+- Les logs HTTP incluent `request-id` et `response-time`.
+- Les erreurs API retournent aussi `error.request_id`.
+
 ### Authentication (`/api/auth`)
 - `POST /register`: Register a new user (tenant).
 - `POST /login`: Generate JWT token.
 
-### Web Resources (`/api/web`) - Requires `staff` role
+### Web Resources (`/api/web`) - Requires `admin` or `manager` role
 - `GET /properties`: List all properties.
 - `POST /properties`: Create property.
 - `GET /contracts`: View all contracts.
@@ -123,3 +135,5 @@ Key entities:
 
 ---
 **Note**: Ensure your Supabase RLS policies are active to secure data access directly at the database level.
+
+

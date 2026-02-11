@@ -1,5 +1,7 @@
 const supabase = require('../config/supabase');
 const createUserClient = require('../config/supabaseUser');
+const { resolveTenant, resolveOrCreateTenant } = require('../utils/tenantResolver');
+const { parsePagination, parseSort, buildListResponse } = require('../utils/listQuery');
 
 /**
  * @swagger
@@ -36,15 +38,58 @@ const createUserClient = require('../config/supabaseUser');
 
 const getContracts = async (req, res, next) => {
     try {
-        const userId = req.user.id;
         const userClient = createUserClient(req.token);
-        const { data, error } = await userClient
-            .from('contracts')
-            .select('*, properties(title)')
-            .eq('tenant_id', userId);
+        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const pagination = parsePagination(req.query);
+        const { sortBy, sortOrder } = parseSort(
+            req.query,
+            ['created_at', 'updated_at', 'start_date', 'status', 'monthly_rent'],
+            'created_at'
+        );
+
+        let tenantIdForList = null;
+
+        const applyFilters = (query) => {
+            let next = query;
+            if (!isBackoffice) {
+                next = next.eq('tenant_id', tenantIdForList);
+            }
+            return next;
+        };
+
+        if (!isBackoffice) {
+            const tenant = await resolveTenant(userClient, req.user);
+            if (!tenant) {
+                return res.status(404).json({ error: 'Tenant profile not found' });
+            }
+            tenantIdForList = tenant.id;
+        }
+
+        let query = applyFilters(
+            userClient
+                .from('contracts')
+                .select('*, properties(title, address), tenants(full_name, email)')
+                .order(sortBy, { ascending: sortOrder === 'asc' })
+        );
+
+        if (pagination.enabled) {
+            query = query.range(pagination.from, pagination.to);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
-        res.status(200).json(data);
+
+        let total = null;
+        if (pagination.enabled) {
+            const { count, error: countError } = await applyFilters(
+                userClient.from('contracts').select('*', { count: 'exact', head: true })
+            );
+            if (countError) throw countError;
+            total = count;
+        }
+
+        res.status(200).json(buildListResponse(data || [], pagination, total));
     } catch (err) {
         next(err);
     }
@@ -54,11 +99,22 @@ const getContractById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userClient = createUserClient(req.token);
-        const { data, error } = await userClient
+        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+
+        let query = userClient
             .from('contracts')
-            .select('*, properties(title)')
-            .eq('id', id)
-            .maybeSingle();
+            .select('*, properties(title, address), tenants(full_name, email)')
+            .eq('id', id);
+
+        if (!isBackoffice) {
+            const tenant = await resolveTenant(userClient, req.user);
+            if (!tenant) {
+                return res.status(404).json({ error: 'Tenant profile not found' });
+            }
+            query = query.eq('tenant_id', tenant.id);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Contract not found' });
@@ -167,17 +223,10 @@ const createContractRequest = async (req, res, next) => {
     try {
         const { property_id, start_date, duration_months } = req.body;
         const userClient = createUserClient(req.token);
-        const userId = req.user.id;
-
-        // 1. Get Tenant ID
-        const { data: tenant, error: tenantError } = await userClient
-            .from('tenants')
-            .select('id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (tenantError) throw tenantError;
-        if (!tenant) return res.status(404).json({ error: 'Tenant profile not found. Please complete your profile first.' });
+        const tenant = await resolveOrCreateTenant(userClient, req.user);
+        if (!tenant) {
+            return res.status(404).json({ error: 'Tenant profile not found. Please complete your profile first.' });
+        }
 
         // 2. Get Property Details
         const { data: property, error: propertyError } = await userClient
@@ -218,19 +267,30 @@ const acceptContract = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userClient = createUserClient(req.token);
+        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const tenant = isBackoffice ? null : await resolveTenant(userClient, req.user);
+
+        if (!isBackoffice && !tenant) {
+            return res.status(404).json({ error: 'Tenant profile not found' });
+        }
 
         // 1. Get Contract
-        const { data: contract, error: fetchError } = await userClient
+        let contractQuery = userClient
             .from('contracts')
             .select('*')
-            .eq('id', id)
-            .single();
+            .eq('id', id);
+
+        if (!isBackoffice) {
+            contractQuery = contractQuery.eq('tenant_id', tenant.id);
+        }
+
+        const { data: contract, error: fetchError } = await contractQuery.single();
 
         if (fetchError) throw fetchError;
         if (contract.status !== 'draft') return res.status(400).json({ error: 'Contract is not in draft state' });
 
         // 2. Update Contract (Sign & Activate)
-        // Set payment_day to 1 and grace_period to 5 as per rules
+        // Rent is due at the beginning of month, with 5 days grace.
         const now = new Date();
         const { data: updatedContract, error: updateError } = await userClient
             .from('contracts')
@@ -249,24 +309,31 @@ const acceptContract = async (req, res, next) => {
         if (updateError) throw updateError;
 
         // 3. Update Property Status
-        await userClient
+        const { error: propertyUpdateError } = await userClient
             .from('properties')
             .update({ status: 'rented' })
             .eq('id', contract.property_id);
+        if (propertyUpdateError) throw propertyUpdateError;
 
-        // 4. Create Initial Payment (Immediate)
-        const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+        // 4. Create Initial Payment (for next month)
+        // Rule: payment should be validated before the 5th of next month.
+        const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const monthName = nextMonthDate.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
         const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        const dueDate = new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 1);
 
-        await userClient
+        const { error: paymentInsertError } = await userClient
             .from('payments')
             .insert([{
                 contract_id: id,
                 month: formattedMonth,
                 amount: contract.monthly_rent + (contract.charges || 0),
-                due_date: now.toISOString(),
-                status: 'pending'
+                due_date: dueDate.toISOString(),
+                status: 'pending',
+                late_fee: 0,
+                validation_status: 'not_submitted'
             }]);
+        if (paymentInsertError) throw paymentInsertError;
 
         res.status(200).json(updatedContract[0]);
     } catch (err) {
@@ -278,13 +345,25 @@ const rejectContract = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userClient = createUserClient(req.token);
+        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const tenant = isBackoffice ? null : await resolveTenant(userClient, req.user);
+
+        if (!isBackoffice && !tenant) {
+            return res.status(404).json({ error: 'Tenant profile not found' });
+        }
 
         // Delete the draft contract
-        const { error } = await userClient
+        let deleteQuery = userClient
             .from('contracts')
             .delete()
             .eq('id', id)
             .eq('status', 'draft'); // Security check
+
+        if (!isBackoffice) {
+            deleteQuery = deleteQuery.eq('tenant_id', tenant.id);
+        }
+
+        const { error } = await deleteQuery;
 
         if (error) throw error;
 
@@ -304,3 +383,5 @@ module.exports = {
     acceptContract,
     rejectContract,
 };
+
+

@@ -4,6 +4,7 @@ import '../auth/auth_service.dart';
 import '../core/models.dart';
 import '../core/providers/dashboard_providers.dart';
 import '../core/constants.dart';
+import '../core/storage.dart';
 
 /// Écran de profil premium pour les locataires
 class ProfileScreen extends ConsumerWidget {
@@ -13,6 +14,8 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
     final authService = AuthService();
+    final storedFullName = StorageService.getUserFullName() ?? '';
+    final storedEmail = StorageService.getUserEmail() ?? '';
 
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
@@ -24,7 +27,7 @@ class ProfileScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              _buildHeader(context, data.tenant),
+              _buildHeader(context, data.tenant, fallbackName: storedFullName),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppConstants.defaultPadding,
@@ -36,23 +39,32 @@ class ProfileScreen extends ConsumerWidget {
                     _buildProfileItem(
                       icon: Icons.person_outline_rounded,
                       title: 'Nom complet',
-                      value: data.tenant.name.isNotEmpty
-                          ? data.tenant.name
-                          : 'Utilisateur',
+                      value: _resolveDisplayName(
+                        data.tenant,
+                        fallbackName: storedFullName,
+                      ),
                     ),
                     _buildProfileItem(
                       icon: Icons.email_outlined,
                       title: 'Email',
-                      value: data.tenant.email.isNotEmpty
-                          ? data.tenant.email
-                          : 'Non disponible',
+                      value: _resolveDisplayEmail(
+                        data.tenant,
+                        fallbackEmail: storedEmail,
+                      ),
                     ),
                     _buildProfileItem(
                       icon: Icons.phone_outlined,
-                      title: 'Téléphone',
+                      title: 'Telephone',
                       value: data.tenant.phone.isNotEmpty
                           ? data.tenant.phone
-                          : 'Non renseigné',
+                          : 'Non renseigne',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildEditProfileButton(
+                      context,
+                      ref,
+                      authService,
+                      data.tenant,
                     ),
                     const SizedBox(height: 32),
                     if (data.property.id.isNotEmpty) ...[
@@ -102,7 +114,11 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   /// Header avec dégradé et avatar
-  Widget _buildHeader(BuildContext context, Tenant tenant) {
+  Widget _buildHeader(
+    BuildContext context,
+    Tenant tenant, {
+    String fallbackName = '',
+  }) {
     return SliverAppBar(
       expandedHeight: 240,
       pinned: true,
@@ -164,7 +180,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  tenant.name.isNotEmpty ? tenant.name : 'Utilisateur',
+                  _resolveDisplayName(tenant, fallbackName: fallbackName),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -198,6 +214,22 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _resolveDisplayName(Tenant tenant, {String fallbackName = ''}) {
+    final tenantName = tenant.name.trim();
+    if (tenantName.isNotEmpty) return tenantName;
+    final storedName = fallbackName.trim();
+    if (storedName.isNotEmpty) return storedName;
+    return 'Utilisateur';
+  }
+
+  String _resolveDisplayEmail(Tenant tenant, {String fallbackEmail = ''}) {
+    final tenantEmail = tenant.email.trim();
+    if (tenantEmail.isNotEmpty) return tenantEmail;
+    final storedEmail = fallbackEmail.trim();
+    if (storedEmail.isNotEmpty) return storedEmail;
+    return 'Non disponible';
   }
 
   /// Titre de section stylisé
@@ -273,6 +305,28 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEditProfileButton(
+    BuildContext context,
+    WidgetRef ref,
+    AuthService authService,
+    Tenant tenant,
+  ) {
+    return OutlinedButton.icon(
+      onPressed: () => _handleEditProfile(context, ref, authService, tenant),
+      icon: const Icon(Icons.edit_rounded, size: 20),
+      label: const Text(
+        'Modifier mes informations',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        foregroundColor: const Color(AppColors.accent),
+        side: const BorderSide(color: Color(AppColors.accent)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -370,6 +424,164 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleEditProfile(
+    BuildContext context,
+    WidgetRef ref,
+    AuthService authService,
+    Tenant tenant,
+  ) async {
+    final nameController = TextEditingController(text: tenant.name);
+    final phoneController = TextEditingController(text: tenant.phone);
+    final formKey = GlobalKey<FormState>();
+    String? submitError;
+    bool isSubmitting = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Material(
+                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Modifier le profil',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(AppColors.textPrimary),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nom complet',
+                            prefixIcon: Icon(Icons.person_outline_rounded),
+                          ),
+                          validator: (value) {
+                            final text = (value ?? '').trim();
+                            if (text.isEmpty) return 'Le nom est requis';
+                            if (text.length < 3) {
+                              return 'Minimum 3 caracteres';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Telephone',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                        ),
+                        if (submitError != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            submitError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                child: const Text('Annuler'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () async {
+                                        if (!formKey.currentState!.validate()) {
+                                          return;
+                                        }
+                                        setModalState(() {
+                                          isSubmitting = true;
+                                          submitError = null;
+                                        });
+                                        try {
+                                          await authService.updateProfile(
+                                            fullName: nameController.text,
+                                            phone: phoneController.text,
+                                          );
+                                          if (!context.mounted) return;
+                                          ref.invalidate(dashboardDataProvider);
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Profil mis a jour',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          setModalState(() {
+                                            submitError = e
+                                                .toString()
+                                                .replaceAll('Exception: ', '');
+                                            isSubmitting = false;
+                                          });
+                                        }
+                                      },
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Enregistrer'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    phoneController.dispose();
   }
 
   /// Gestion de la déconnexion avec confirmation

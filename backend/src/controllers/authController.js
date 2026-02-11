@@ -14,13 +14,15 @@ const createUserClient = require('../config/supabaseUser');
  *           type: string
  *         role:
  *           type: string
- *           enum: [admin, manager, staff]
+ *           enum: [admin, manager, tenant]
  */
 
 const register = async (req, res, next) => {
     try {
         const { email, password, full_name, role } = req.body;
         const normalizedEmail = normalizeEmail(email);
+        const normalizedFullName = String(full_name || '').trim();
+        const normalizedRole = String(role || 'tenant').trim().toLowerCase();
 
         if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
             return res.status(400).json({ error: 'Invalid email address' });
@@ -28,8 +30,13 @@ const register = async (req, res, next) => {
         if (!password || String(password).length < 6) {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
-        if (!full_name || String(full_name).trim().length < 3) {
+        if (!normalizedFullName || normalizedFullName.length < 3) {
             return res.status(400).json({ error: 'Full name is required' });
+        }
+        // Public self-signup can only create tenant or manager accounts.
+        // Admin creation must stay restricted to privileged backend flow.
+        if (!['tenant', 'manager'].includes(normalizedRole)) {
+            return res.status(400).json({ error: 'Invalid role for public registration' });
         }
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -52,12 +59,26 @@ const register = async (req, res, next) => {
                 .insert([
                     {
                         id: authData.user.id,
-                        full_name,
-                        role: role || 'manager',
+                        full_name: normalizedFullName,
+                        role: normalizedRole,
                     }
                 ]);
 
             if (profileError) throw profileError;
+
+            // Keep tenant profile row in sync for mobile-only tenant flow.
+            if (normalizedRole === 'tenant') {
+                // If this fails (RLS/conflict), mobile has fallback to profiles.
+                await userClient
+                    .from('tenants')
+                    .insert([
+                        {
+                            user_id: authData.user.id,
+                            email: normalizedEmail,
+                            full_name: normalizedFullName,
+                        }
+                    ]);
+            }
         }
 
         res.status(201).json({
@@ -126,9 +147,10 @@ const getProfile = async (req, res, next) => {
 const updateProfile = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
+        const payload = sanitizeProfileUpdate(req.body);
         const { data, error } = await userClient
             .from('profiles')
-            .update(req.body)
+            .update(payload)
             .eq('id', req.user.id)
             .select();
 
@@ -178,3 +200,17 @@ function normalizeEmail(value) {
 function isValidEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
+
+function sanitizeProfileUpdate(input) {
+    const safe = {};
+    const allowed = ['full_name', 'phone', 'avatar_url', 'preferred_language', 'theme'];
+
+    for (const key of allowed) {
+        if (Object.prototype.hasOwnProperty.call(input || {}, key)) {
+            safe[key] = input[key];
+        }
+    }
+
+    return safe;
+}
+

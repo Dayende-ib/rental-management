@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
+import PaginationControls from "../components/PaginationControls";
 import {
   Wrench,
   Plus,
@@ -21,6 +22,13 @@ export default function MaintenanceRequests() {
   const [properties, setProperties] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,11 +84,14 @@ export default function MaintenanceRequests() {
     completion_date: data.completion_date || null,
   });
 
-  const fetchRequests = async () => {
+  const fetchRequests = async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/maintenance");
-      setRequests(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/maintenance", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setRequests(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setRequests([]);
@@ -121,7 +132,7 @@ export default function MaintenanceRequests() {
       resetForm();
       setShowForm(false);
       setEditingRequestId(null);
-      fetchRequests();
+      fetchRequests(page);
     } catch (err) {
       console.error(err);
       alert(
@@ -134,7 +145,10 @@ export default function MaintenanceRequests() {
   };
 
   useEffect(() => {
-    fetchRequests();
+    fetchRequests(page);
+  }, [page]);
+
+  useEffect(() => {
     fetchProperties();
     fetchTenants();
   }, []);
@@ -192,7 +206,7 @@ export default function MaintenanceRequests() {
   const updateStatus = async (id, status) => {
     try {
       await api.put(`/maintenance/${id}`, { status });
-      fetchRequests();
+      fetchRequests(page);
     } catch (err) {
       console.error(err);
     }
@@ -394,7 +408,7 @@ export default function MaintenanceRequests() {
           <div className="flex items-center justify-between">
             <div>
               <p className="mb-1 text-sm text-gray-500">Total des demandes</p>
-              <p className="text-3xl font-bold text-gray-900">{requests.length}</p>
+              <p className="text-3xl font-bold text-gray-900">{meta.total_items}</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-2xl">
               <Wrench className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -476,6 +490,14 @@ export default function MaintenanceRequests() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

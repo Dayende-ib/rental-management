@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
+import '../core/storage.dart';
 import '../core/providers/dashboard_providers.dart';
 import '../core/providers/payment_providers.dart';
 import '../widgets/stat_charts.dart';
@@ -97,7 +98,10 @@ class HomeScreen extends ConsumerWidget {
   }
 
   SliverAppBar _buildHeaderSliver(Tenant tenant, Property property) {
-    final name = (tenant.name).isNotEmpty ? tenant.name : 'Utilisateur';
+    final storedName = (StorageService.getUserFullName() ?? '').trim();
+    final name = (tenant.name).isNotEmpty
+        ? tenant.name
+        : (storedName.isNotEmpty ? storedName : 'Utilisateur');
     final addressLine = [
       property.address,
       '${property.postalCode} ${property.city}',

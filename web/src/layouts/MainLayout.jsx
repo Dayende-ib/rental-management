@@ -18,6 +18,8 @@ import {
 import api from "../services/api";
 import { subscribeLoading } from "../services/loadingStore";
 
+const WEB_ALLOWED_ROLES = ["admin", "manager"];
+
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -40,6 +42,13 @@ export default function MainLayout() {
         }
         const res = await api.get("/auth/profile");
         if (res.data) {
+          const role = String(res.data.role || "");
+          if (!WEB_ALLOWED_ROLES.includes(role)) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            navigate("/", { replace: true });
+            return;
+          }
           setUser(prev => ({ ...prev, ...res.data }));
         }
       } catch (error) {
@@ -52,7 +61,7 @@ export default function MainLayout() {
       }
     };
     fetchUser();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const unsubscribe = subscribeLoading((count) => setLoadingCount(count));
@@ -75,9 +84,16 @@ export default function MainLayout() {
       avatar: "bg-gradient-to-br from-emerald-500 to-teal-600",
     };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Erreur logout:", error);
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/", { replace: true });
+    }
   };
 
   const getInitials = (name = "") => {
@@ -272,4 +288,5 @@ export default function MainLayout() {
     </div>
   );
 }
+
 

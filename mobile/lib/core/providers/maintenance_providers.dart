@@ -10,7 +10,7 @@ final maintenanceServiceProvider = Provider<MaintenanceService>((ref) {
 });
 
 /// Maintenance requests provider with offline support
-final maintenanceRequestsProvider = FutureProvider<List<MaintenanceRequest>>((
+final maintenanceRequestsProvider = FutureProvider.autoDispose<List<MaintenanceRequest>>((
   ref,
 ) async {
   final maintenanceService = ref.watch(maintenanceServiceProvider);

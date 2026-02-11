@@ -4,13 +4,22 @@ const morgan = require('morgan');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const errorHandler = require('./middlewares/errorHandler');
+const requestContext = require('./middlewares/requestContext');
 
 const app = express();
 
 // Middleware
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json());
+const corsOrigins = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+morgan.token('request-id', (req) => req.requestId || '-');
+
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
+app.use(requestContext);
+app.use(morgan(':date[iso] :request-id :method :url :status :response-time ms'));
+app.use(express.json({ limit: '1mb' }));
 
 // Swagger Documentation
 const swaggerOptions = {
@@ -30,13 +39,23 @@ const swaggerOptions = {
     apis: ['./src/routes/*.js'],
 };
 
+swaggerOptions.definition.components = {
+    securitySchemes: {
+        bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+        },
+    },
+};
+
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 
-// Web Routes (Admin, Manager, Staff)
+// Web Routes (admin, manager)
 app.use('/api/web', require('./routes/web/index'));
 
 // Mobile Routes (Tenant)
@@ -57,18 +76,8 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Swagger Documentation security definition
-swaggerOptions.definition.components = {
-    securitySchemes: {
-        bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-        },
-    },
-};
-
 // Error Handler
 app.use(errorHandler);
 
 module.exports = app;
+

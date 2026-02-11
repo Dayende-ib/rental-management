@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import api from "../services/api";
+import PaginationControls from "../components/PaginationControls";
 import {
   Home,
   Plus,
@@ -23,6 +24,13 @@ import {
 export default function Properties() {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingPropertyId, setEditingPropertyId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,18 +124,21 @@ export default function Properties() {
     return fallback;
   };
 
-  const fetchProperties = async () => {
+  const fetchProperties = useCallback(async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/properties");
-      setProperties(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/properties", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setProperties(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setProperties([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [meta.limit, page]);
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -190,7 +201,7 @@ export default function Properties() {
       resetForm();
       setShowForm(false);
       setEditingPropertyId(null);
-      fetchProperties();
+      fetchProperties(page);
     } catch (err) {
       console.error(err);
       alert(
@@ -207,15 +218,15 @@ export default function Properties() {
   };
 
   useEffect(() => {
-    fetchProperties();
-  }, []);
+    fetchProperties(page);
+  }, [page, fetchProperties]);
 
   useEffect(() => {
     const fetchRole = async () => {
       try {
         const res = await api.get("/auth/profile");
         setUserRole(res.data?.role || "");
-      } catch (err) {
+      } catch {
         setUserRole("");
       }
     };
@@ -287,7 +298,9 @@ export default function Properties() {
     if (!confirmed) return;
     try {
       await api.delete(`/properties/${propertyId}`);
-      fetchProperties();
+      const nextPage = properties.length === 1 && page > 1 ? page - 1 : page;
+      setPage(nextPage);
+      fetchProperties(nextPage);
     } catch (err) {
       console.error(err);
       alert(
@@ -516,7 +529,7 @@ export default function Properties() {
         <div className="p-8 bg-white border border-slate-100 shadow-sm rounded-[2.5rem] flex items-center justify-between group hover:shadow-xl transition-all">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Total Biens</p>
-            <p className="text-4xl font-black text-slate-900 font-display tracking-tight">{properties.length}</p>
+            <p className="text-4xl font-black text-slate-900 font-display tracking-tight">{meta.total_items}</p>
           </div>
           <div className="p-5 bg-slate-50 rounded-2xl group-hover:bg-emerald-50 transition-colors">
             <Home className="w-8 h-8 text-slate-400 group-hover:text-emerald-500" strokeWidth={1.5} />
@@ -723,6 +736,14 @@ export default function Properties() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

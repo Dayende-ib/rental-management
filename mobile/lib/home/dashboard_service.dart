@@ -46,8 +46,28 @@ class DashboardService {
 
   Future<Tenant> _fetchTenant() async {
     try {
-      final data = await _apiClient.get(AppConstants.tenantProfileEndpoint);
-      return Tenant.fromJson(data);
+      final tenantData = await _apiClient.get(
+        AppConstants.tenantProfileEndpoint,
+      );
+      try {
+        final profileData = await _apiClient.get(AppConstants.profileEndpoint);
+        final merged = <String, dynamic>{...profileData, ...tenantData};
+        final tenantName = (tenantData['full_name'] ?? tenantData['name'] ?? '')
+            .toString()
+            .trim();
+        if (tenantName.isEmpty) {
+          final profileName =
+              (profileData['full_name'] ?? profileData['name'] ?? '')
+                  .toString()
+                  .trim();
+          if (profileName.isNotEmpty) {
+            merged['full_name'] = profileName;
+          }
+        }
+        return Tenant.fromJson(merged);
+      } catch (_) {
+        return Tenant.fromJson(tenantData);
+      }
     } catch (_) {
       final data = await _apiClient.get(AppConstants.profileEndpoint);
       return Tenant.fromJson(data);
@@ -71,10 +91,26 @@ class DashboardService {
   Future<Property> _fetchProperty(Map<String, dynamic>? contract) async {
     if (contract != null && contract['property_id'] != null) {
       final propertyId = contract['property_id'].toString();
-      final data = await _apiClient.get(
-        '${AppConstants.propertiesEndpoint}/$propertyId',
+      final mineData = await _apiClient.getList(
+        '${AppConstants.propertiesEndpoint}?scope=mine',
       );
-      final property = Property.fromJson(data);
+      Property? property;
+      for (final item in mineData) {
+        if (item is Map<String, dynamic> &&
+            item['id']?.toString() == propertyId) {
+          property = Property.fromJson(item);
+          break;
+        }
+      }
+
+      property ??= Property(
+        id: propertyId,
+        title: (contract['properties']?['title'] ?? '').toString(),
+        address: (contract['properties']?['address'] ?? '').toString(),
+        city: '',
+        postalCode: '',
+        monthlyRent: 0,
+      );
       final rent = _toDouble(
         contract['monthly_rent'] ?? contract['monthlyRent'],
       );

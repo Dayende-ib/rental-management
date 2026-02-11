@@ -202,6 +202,16 @@ class ApiClient {
     if (data is List<dynamic>) {
       return data;
     }
+    if (data is Map<String, dynamic>) {
+      final fromData = data['data'];
+      if (fromData is List<dynamic>) {
+        return fromData;
+      }
+      final fromItems = data['items'];
+      if (fromItems is List<dynamic>) {
+        return fromItems;
+      }
+    }
     throw ApiException('Unexpected response format', response.statusCode);
   }
 

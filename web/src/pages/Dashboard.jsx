@@ -38,11 +38,9 @@ export default function Dashboard() {
   const [statusBreakdown, setStatusBreakdown] = useState([]);
   const [propertyTypeBreakdown, setPropertyTypeBreakdown] = useState([]);
   const [maintenanceBreakdown, setMaintenanceBreakdown] = useState([]);
-  const [ownerMap, setOwnerMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   const [occupancyRate, setOccupancyRate] = useState(0);
-  const [totalYield, setTotalYield] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -165,10 +163,9 @@ export default function Dashboard() {
             (ownersRes.data || []).forEach((u) => {
               owners[u.id] = u.full_name || "Bailleur";
             });
-          } catch (err) {
+          } catch {
             owners = {};
           }
-          setOwnerMap(owners);
           const byOwner = new Map();
           properties.forEach((property) => {
             const name = owners[property.owner_id] || "Bailleur inconnu";
@@ -193,7 +190,7 @@ export default function Dashboard() {
           overdue,
           maintenance: maintenanceOpen,
         });
-      } catch (err) {
+      } catch {
         console.log("Backend indisponible ? stats  0");
       } finally {
         setLoading(false);
@@ -202,53 +199,59 @@ export default function Dashboard() {
     fetchStats();
   }, []);
 
-  const StatCard = ({ title, value, icon: Icon, link, gradient, subValue, delay }) => (
-    <div
-      onClick={() => navigate(link)}
-      className="relative overflow-hidden transition-all duration-500 bg-white border border-gray-100 shadow-sm cursor-pointer group rounded-3xl hover:shadow-xl hover:-translate-y-1"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500`} />
+  const StatCard = ({ title, value, icon, link, gradient, subValue, delay }) => {
+    const IconComponent = icon;
+    return (
+      <div
+        onClick={() => navigate(link)}
+        className="relative overflow-hidden transition-all duration-500 bg-white border border-gray-100 shadow-sm cursor-pointer group rounded-3xl hover:shadow-xl hover:-translate-y-1"
+        style={{ animationDelay: `${delay}ms` }}
+      >
+        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500`} />
 
-      <div className="relative p-7">
-        <div className="flex items-start justify-between mb-5">
-          <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} bg-opacity-10 shadow-inner`}>
-            <Icon className="w-7 h-7 text-gray-800" strokeWidth={1.5} />
+        <div className="relative p-7">
+          <div className="flex items-start justify-between mb-5">
+            <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} bg-opacity-10 shadow-inner`}>
+              <IconComponent className="w-7 h-7 text-gray-800" strokeWidth={1.5} />
+            </div>
+            <div className="flex items-center justify-center w-8 h-8 transition-transform group-hover:rotate-45">
+              <ArrowUpRight className="w-6 h-6 text-gray-300" />
+            </div>
           </div>
-          <div className="flex items-center justify-center w-8 h-8 transition-transform group-hover:rotate-45">
-            <ArrowUpRight className="w-6 h-6 text-gray-300" />
+
+          <div className="space-y-1">
+            <p className="text-xs font-bold tracking-[0.1em] text-gray-400 uppercase">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-3xl font-black tracking-tight text-gray-900 font-display">{value}</h3>
+              {subValue && (
+                <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                  {subValue}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="space-y-1">
-          <p className="text-xs font-bold tracking-[0.1em] text-gray-400 uppercase">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-black tracking-tight text-gray-900 font-display">{value}</h3>
-            {subValue && (
-              <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                {subValue}
-              </span>
-            )}
-          </div>
+        <div className="absolute bottom-0 left-0 w-full h-1.5 transition-all duration-700 bg-gray-50 overflow-hidden">
+          <div className={`h-full w-0 group-hover:w-full transition-all duration-1000 ease-out bg-gradient-to-r ${gradient}`} />
         </div>
       </div>
+    );
+  };
 
-      <div className="absolute bottom-0 left-0 w-full h-1.5 transition-all duration-700 bg-gray-50 overflow-hidden">
-        <div className={`h-full w-0 group-hover:w-full transition-all duration-1000 ease-out bg-gradient-to-r ${gradient}`} />
-      </div>
-    </div>
-  );
-
-  const QuickAction = ({ title, icon: Icon, onClick, color }) => (
-    <button
-      onClick={onClick}
-      className={`group relative overflow-hidden px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r ${color} hover:shadow-2xl hover:shadow-indigo-200 transition-all duration-500 flex items-center gap-3 active:scale-95`}
-    >
-      <Icon size={20} strokeWidth={2.5} />
-      <span>{title}</span>
-      <div className="absolute inset-0 transition-opacity bg-white opacity-0 group-hover:opacity-15" />
-    </button>
-  );
+  const QuickAction = ({ title, icon, onClick, color }) => {
+    const IconComponent = icon;
+    return (
+      <button
+        onClick={onClick}
+        className={`group relative overflow-hidden px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r ${color} hover:shadow-2xl hover:shadow-indigo-200 transition-all duration-500 flex items-center gap-3 active:scale-95`}
+      >
+        <IconComponent size={20} strokeWidth={2.5} />
+        <span>{title}</span>
+        <div className="absolute inset-0 transition-opacity bg-white opacity-0 group-hover:opacity-15" />
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-10 animate-fadeIn p-2 md:p-4">

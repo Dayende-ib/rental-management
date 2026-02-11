@@ -76,6 +76,36 @@ class StorageService {
     return await _prefs.remove(AppConstants.userIdKey);
   }
 
+  /// Save user full name
+  static Future<bool> saveUserFullName(String fullName) async {
+    return await _prefs.setString(AppConstants.userFullNameKey, fullName);
+  }
+
+  /// Get user full name
+  static String? getUserFullName() {
+    return _prefs.getString(AppConstants.userFullNameKey);
+  }
+
+  /// Remove user full name
+  static Future<bool> removeUserFullName() async {
+    return await _prefs.remove(AppConstants.userFullNameKey);
+  }
+
+  /// Save user email
+  static Future<bool> saveUserEmail(String email) async {
+    return await _prefs.setString(AppConstants.userEmailKey, email);
+  }
+
+  /// Get user email
+  static String? getUserEmail() {
+    return _prefs.getString(AppConstants.userEmailKey);
+  }
+
+  /// Remove user email
+  static Future<bool> removeUserEmail() async {
+    return await _prefs.remove(AppConstants.userEmailKey);
+  }
+
   /// Save custom backend URL to local storage
   static Future<bool> saveBaseUrl(String url) async {
     return await _prefs.setString(AppConstants.customBaseUrlKey, url);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../services/api";
 import {
   UserCog,
@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import PaginationControls from "../components/PaginationControls";
 
 export default function UsersPage() {
   const [profile, setProfile] = useState(null);
@@ -20,12 +21,19 @@ export default function UsersPage() {
   const [usersError, setUsersError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     password: "",
     phone: "",
-    role: "staff",
+    role: "manager",
   });
 
   const getErrorMessage = (err, fallback) => {
@@ -51,12 +59,15 @@ export default function UsersPage() {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (targetPage = page) => {
     try {
       setLoadingUsers(true);
       setUsersError("");
-      const res = await api.get("/users");
-      setUsers(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/users", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setUsers(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setUsers([]);
@@ -64,12 +75,15 @@ export default function UsersPage() {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [meta.limit, page]);
 
   useEffect(() => {
     fetchProfile();
-    fetchUsers();
   }, []);
+
+  useEffect(() => {
+    fetchUsers(page);
+  }, [page, fetchUsers]);
 
   const resetForm = () => {
     setFormData({
@@ -77,7 +91,7 @@ export default function UsersPage() {
       email: "",
       password: "",
       phone: "",
-      role: "staff",
+      role: "manager",
     });
   };
 
@@ -91,11 +105,12 @@ export default function UsersPage() {
         password: formData.password,
         role: formData.role,
       };
-      await api.post("/auth/register", payload);
+      await api.post("/users", payload);
       alert("Utilisateur cree avec succes.");
       resetForm();
       setShowForm(false);
-      fetchUsers();
+      setPage(1);
+      fetchUsers(1);
     } catch (err) {
       console.error(err);
       alert(getErrorMessage(err, "Erreur lors de la creation de l'utilisateur"));
@@ -111,7 +126,9 @@ export default function UsersPage() {
     if (!confirmed) return;
     try {
       await api.delete(`/users/${userId}`);
-      fetchUsers();
+      const nextPage = users.length === 1 && page > 1 ? page - 1 : page;
+      setPage(nextPage);
+      fetchUsers(nextPage);
     } catch (err) {
       console.error(err);
       alert(getErrorMessage(err, "Erreur lors de la suppression de l'utilisateur"));
@@ -130,7 +147,6 @@ export default function UsersPage() {
     const styles = {
       admin: "bg-blue-100 text-blue-800",
       manager: "bg-purple-100 text-purple-800",
-      staff: "bg-green-100 text-green-800",
       tenant: "bg-gray-100 text-gray-700",
     };
     return (
@@ -145,7 +161,7 @@ export default function UsersPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-2 text-3xl font-bold text-gray-900">Gestion utilisateurs</h1>
-          <p className="text-gray-500">Creez et supprimez les comptes admin, manager et staff</p>
+          <p className="text-gray-500">Creez et supprimez les comptes admin et manager</p>
         </div>
         {!showForm && (
           <button
@@ -194,9 +210,9 @@ export default function UsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="mb-1 text-sm text-gray-500">Total utilisateurs</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {loadingUsers ? "..." : users.length}
-              </p>
+                  <p className="text-3xl font-bold text-gray-900">
+                {loadingUsers ? "..." : meta.total_items}
+                  </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-[#3B82F6] to-[#2563EB] rounded-2xl">
               <Users className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -212,7 +228,7 @@ export default function UsersPage() {
               <p className="text-lg font-semibold text-gray-900">Rafraichir la liste</p>
             </div>
             <button
-              onClick={fetchUsers}
+              onClick={() => fetchUsers(page)}
               className="p-3 rounded-2xl bg-[#2563EB] bg-opacity-10 text-[#2563EB] hover:bg-opacity-20 transition-colors"
               title="Rafraichir"
             >
@@ -285,7 +301,6 @@ export default function UsersPage() {
                 >
                   <option value="admin">admin</option>
                   <option value="manager">manager</option>
-                  <option value="staff">staff</option>
                 </select>
               </div>
             </div>
@@ -372,6 +387,14 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

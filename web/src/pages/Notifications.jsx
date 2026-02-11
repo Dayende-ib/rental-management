@@ -1,32 +1,43 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../services/api";
 import { Bell, Check, Info, AlertTriangle, XCircle } from "lucide-react";
+import PaginationControls from "../components/PaginationControls";
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 20,
+    total_items: 0,
+    total_pages: 1,
+  });
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/notifications");
-      setNotifications(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/notifications", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setNotifications(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setNotifications([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [meta.limit, page]);
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    fetchNotifications(page);
+  }, [page, fetchNotifications]);
 
   const markRead = async (id) => {
     try {
       await api.patch(`/notifications/${id}/read`);
-      fetchNotifications();
+      fetchNotifications(page);
     } catch (err) {
       console.error(err);
     }
@@ -54,7 +65,7 @@ export default function Notifications() {
         </div>
         <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 bg-white border border-gray-100 rounded-xl">
           <Bell className="w-4 h-4" />
-          {notifications.filter((n) => !n.is_read).length} non lues
+          {notifications.filter((n) => !n.is_read).length} non lues (page)
         </div>
       </div>
 
@@ -101,6 +112,14 @@ export default function Notifications() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

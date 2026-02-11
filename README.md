@@ -7,13 +7,13 @@ A comprehensive solution for managing rental properties, tenants, contracts, and
 The project is organized into three main components:
 
 - **[Backend](./backend/README.md)**: REST API built with Node.js, Express, and Supabase. Handles authentication, data persistence, and business logic.
-- **[Web App](./web/README.md)**: Administrative dashboard for property managers and staff. Built with React and Vite.
+- **[Web App](./web/README.md)**: Administrative dashboard for property managers and admins. Built with React and Vite.
 - **[Mobile App](./mobile/README.md)**: Mobile application for tenants to view properties, pay rent, and request maintenance. Built with Flutter.
 
 ## 🚀 Key Features
 
 - **Role-Based Access Control**:
-  - **Admin/Manager/Staff**: Full access via the Web Dashboard.
+  - **Admin/Manager**: Full access via the Web Dashboard.
   - **Tenants**: Limited access to their own data via the Mobile App.
   - **Public/Guest**: View available properties.
 - **Property Management**: Track properties, availability, and details.
@@ -39,3 +39,5 @@ To get the entire system running locally, you need to set up each component inde
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+

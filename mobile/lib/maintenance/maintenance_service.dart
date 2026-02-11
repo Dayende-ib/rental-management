@@ -10,15 +10,11 @@ class MaintenanceService {
   /// Get all maintenance requests for the current tenant
   Future<List<MaintenanceRequest>> getMaintenanceRequests() async {
     try {
-      final propertyId = await _resolvePropertyId();
       final data = await _apiClient.getList(AppConstants.maintenanceEndpoint);
       final requests = <MaintenanceRequest>[];
       for (final item in data) {
         if (item is Map<String, dynamic>) {
-          if (propertyId == null || propertyId.isEmpty ||
-              item['property_id']?.toString() == propertyId) {
-            requests.add(MaintenanceRequest.fromJson(item));
-          }
+          requests.add(MaintenanceRequest.fromJson(item));
         }
       }
       requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -40,6 +36,7 @@ class MaintenanceService {
         AppConstants.maintenanceEndpoint,
         body: {
           'property_id': propertyId,
+          'title': _buildTitle(description),
           'description': description,
         },
       );
@@ -52,24 +49,45 @@ class MaintenanceService {
 
   Future<String?> _resolvePropertyId() async {
     try {
-      final tenant = await _apiClient.get(AppConstants.tenantProfileEndpoint);
-      final tenantId = tenant['id']?.toString();
-      if (tenantId != null && tenantId.isNotEmpty) {
-        final contracts =
-            await _apiClient.getList(AppConstants.contractsEndpoint);
-        for (final item in contracts) {
-          if (item is Map<String, dynamic> &&
-              item['tenant_id']?.toString() == tenantId) {
-            return item['property_id']?.toString();
+      // /mobile/contracts is already tenant-scoped by backend.
+      final contracts = await _apiClient.getList(
+        AppConstants.contractsEndpoint,
+      );
+      if (contracts.isNotEmpty) {
+        // Prioritize active contracts, then pending/draft.
+        final ranked = contracts.whereType<Map<String, dynamic>>().toList()
+          ..sort((a, b) => _contractRank(a).compareTo(_contractRank(b)));
+        for (final item in ranked) {
+          final propertyId = item['property_id']?.toString();
+          if (propertyId != null && propertyId.isNotEmpty) {
+            return propertyId;
           }
         }
       }
     } catch (_) {}
 
-    final properties = await _apiClient.getList(AppConstants.propertiesEndpoint);
-    if (properties.isNotEmpty && properties.first is Map<String, dynamic>) {
-      return (properties.first as Map<String, dynamic>)['id']?.toString();
-    }
+    // Do not fallback to random available property; maintenance must target user's own property.
     return null;
+  }
+
+  int _contractRank(Map<String, dynamic> contract) {
+    final status = (contract['status'] ?? '').toString().toLowerCase();
+    switch (status) {
+      case 'active':
+        return 0;
+      case 'pending':
+        return 1;
+      case 'draft':
+        return 2;
+      default:
+        return 9;
+    }
+  }
+
+  String _buildTitle(String description) {
+    final raw = description.trim();
+    if (raw.isEmpty) return 'Maintenance request';
+    if (raw.length <= 80) return raw;
+    return '${raw.substring(0, 77)}...';
   }
 }

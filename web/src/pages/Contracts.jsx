@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
+import PaginationControls from "../components/PaginationControls";
 import {
   FileText,
   Plus,
@@ -21,6 +22,13 @@ export default function Contracts() {
   const [properties, setProperties] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingContractId, setEditingContractId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,11 +111,14 @@ export default function Contracts() {
     signed_at: data.signed_at || null,
     contract_document_url: data.contract_document_url || null,
   });
-  const fetchContracts = async () => {
+  const fetchContracts = async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/contracts");
-      setContracts(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/contracts", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setContracts(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setContracts([]);
@@ -148,7 +159,7 @@ export default function Contracts() {
       resetForm();
       setShowForm(false);
       setEditingContractId(null);
-      fetchContracts();
+      fetchContracts(page);
     } catch (err) {
       console.error(err);
       alert(
@@ -163,7 +174,10 @@ export default function Contracts() {
   };
 
   useEffect(() => {
-    fetchContracts();
+    fetchContracts(page);
+  }, [page]);
+
+  useEffect(() => {
     fetchProperties();
     fetchTenants();
   }, []);
@@ -213,7 +227,9 @@ export default function Contracts() {
     if (!confirmed) return;
     try {
       await api.delete(`/contracts/${contractId}`);
-      fetchContracts();
+      const nextPage = contracts.length === 1 && page > 1 ? page - 1 : page;
+      setPage(nextPage);
+      fetchContracts(nextPage);
     } catch (err) {
       console.error(err);
       alert(
@@ -441,7 +457,7 @@ export default function Contracts() {
           <div className="flex items-center justify-between">
             <div>
               <p className="mb-1 text-sm text-gray-500">Total des contrats</p>
-              <p className="text-3xl font-bold text-gray-900">{contracts.length}</p>
+              <p className="text-3xl font-bold text-gray-900">{meta.total_items}</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-2xl">
               <FileText className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -883,6 +899,14 @@ export default function Contracts() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

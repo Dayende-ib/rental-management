@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
+import PaginationControls from "../components/PaginationControls";
 import {
   Users,
   Plus,
@@ -18,6 +19,13 @@ import {
 export default function Tenants() {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,11 +74,14 @@ export default function Tenants() {
     return colors[index % colors.length];
   };
 
-  const fetchTenants = async () => {
+  const fetchTenants = async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/tenants");
-      setTenants(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/tenants", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setTenants(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setTenants([]);
@@ -119,7 +130,7 @@ export default function Tenants() {
       resetForm();
       setShowForm(false);
       setEditingTenantId(null);
-      fetchTenants();
+      fetchTenants(page);
     } catch (err) {
       console.error(err);
       alert(
@@ -134,8 +145,8 @@ export default function Tenants() {
   };
 
   useEffect(() => {
-    fetchTenants();
-  }, []);
+    fetchTenants(page);
+  }, [page]);
 
   useEffect(() => {
     if (showForm) {
@@ -222,7 +233,9 @@ export default function Tenants() {
     if (!confirmed) return;
     try {
       await api.delete(`/tenants/${tenantId}`);
-      fetchTenants();
+      const nextPage = tenants.length === 1 && page > 1 ? page - 1 : page;
+      setPage(nextPage);
+      fetchTenants(nextPage);
     } catch (err) {
       console.error(err);
       alert(getErrorMessage(err, "Erreur lors de la suppression du locataire"));
@@ -372,7 +385,7 @@ export default function Tenants() {
           <div className="flex items-center justify-between">
             <div>
               <p className="mb-1 text-sm text-gray-500">Total des locataires</p>
-              <p className="text-3xl font-bold text-gray-900">{tenants.length}</p>
+              <p className="text-3xl font-bold text-gray-900">{meta.total_items}</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-2xl">
               <Users className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -664,6 +677,14 @@ export default function Tenants() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
+import PaginationControls from "../components/PaginationControls";
 import {
   DollarSign,
   Plus,
@@ -19,6 +20,13 @@ export default function Payments() {
   const [payments, setPayments] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 12,
+    total_items: 0,
+    total_pages: 1,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,11 +72,14 @@ export default function Payments() {
 
   const toDateValue = (value) => (value ? value.slice(0, 10) : "");
 
-  const fetchPayments = async () => {
+  const fetchPayments = async (targetPage = page) => {
     try {
       setLoading(true);
-      const res = await api.get("/payments");
-      setPayments(res.data || []);
+      const { items, meta: responseMeta } = await api.getList("/payments", {
+        params: { page: targetPage, limit: meta.limit },
+      });
+      setPayments(items || []);
+      setMeta(responseMeta);
     } catch (err) {
       console.error(err);
       setPayments([]);
@@ -92,7 +103,10 @@ export default function Payments() {
   };
 
   useEffect(() => {
-    fetchPayments();
+    fetchPayments(page);
+  }, [page]);
+
+  useEffect(() => {
     fetchContracts();
   }, []);
 
@@ -197,7 +211,7 @@ export default function Payments() {
   const handleValidate = async (paymentId) => {
     try {
       await api.post(`/payments/${paymentId}/validate`);
-      fetchPayments();
+      fetchPayments(page);
     } catch (err) {
       console.error(err);
     }
@@ -208,7 +222,7 @@ export default function Payments() {
     if (!reason) return;
     try {
       await api.post(`/payments/${paymentId}/reject`, { rejection_reason: reason });
-      fetchPayments();
+      fetchPayments(page);
     } catch (err) {
       console.error(err);
     }
@@ -396,6 +410,7 @@ export default function Payments() {
               <p className="text-2xl font-bold text-[#1C9B7E]">
                 {totalAmount.toLocaleString()} FCFA
               </p>
+              <p className="mt-1 text-xs text-gray-500">{meta.total_items} paiements</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-2xl">
               <DollarSign className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -460,6 +475,14 @@ export default function Payments() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta.page}
+        totalPages={meta.total_pages}
+        totalItems={meta.total_items}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(meta.total_pages || p, p + 1))}
+      />
     </div>
   );
 }

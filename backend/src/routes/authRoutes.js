@@ -34,9 +34,6 @@ const authMiddleware = require('../middlewares/auth');
  *                 type: string
  *               full_name:
  *                 type: string
- *               role:
- *                 type: string
- *                 enum: [admin, manager, staff]
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -133,3 +130,4 @@ router.get('/profile', authMiddleware, authController.getProfile);
 router.put('/profile', authMiddleware, authController.updateProfile);
 
 module.exports = router;
+

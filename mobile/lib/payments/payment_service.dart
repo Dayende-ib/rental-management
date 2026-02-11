@@ -10,21 +10,35 @@ class PaymentService {
   /// Get all payments for the current tenant
   Future<List<Payment>> getPayments() async {
     try {
-      final contractIds = await _resolveContractIds();
       final data = await _apiClient.getList(AppConstants.paymentsEndpoint);
       final payments = <Payment>[];
       for (final item in data) {
         if (item is Map<String, dynamic>) {
-          if (contractIds.isEmpty ||
-              contractIds.contains(item['contract_id']?.toString())) {
-            payments.add(Payment.fromJson(item));
-          }
+          payments.add(Payment.fromJson(item));
         }
       }
       payments.sort((a, b) => b.dueDate.compareTo(a.dueDate));
       return payments;
     } catch (e) {
       throw Exception('Failed to load payments: $e');
+    }
+  }
+
+  /// Create a manual payment entry for a future month.
+  Future<bool> createManualPayment({
+    required DateTime dueMonth,
+    required double amount,
+  }) async {
+    try {
+      final dueDate = DateTime(dueMonth.year, dueMonth.month, 1);
+      await _apiClient.post(
+        '${AppConstants.paymentsEndpoint}/manual',
+        body: {'amount': amount, 'due_date': dueDate.toIso8601String()},
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Manual payment creation error: $e');
+      return false;
     }
   }
 
@@ -56,29 +70,6 @@ class PaymentService {
     } catch (e) {
       debugPrint('Payment error: $e');
       return false;
-    }
-  }
-
-  Future<Set<String>> _resolveContractIds() async {
-    try {
-      final tenant = await _apiClient.get(AppConstants.tenantProfileEndpoint);
-      final tenantId = tenant['id']?.toString();
-      if (tenantId == null || tenantId.isEmpty) return {};
-
-      final contracts = await _apiClient.getList(
-        AppConstants.contractsEndpoint,
-      );
-      final ids = <String>{};
-      for (final item in contracts) {
-        if (item is Map<String, dynamic> &&
-            item['tenant_id']?.toString() == tenantId &&
-            item['id'] != null) {
-          ids.add(item['id'].toString());
-        }
-      }
-      return ids;
-    } catch (_) {
-      return {};
     }
   }
 }

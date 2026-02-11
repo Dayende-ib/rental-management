@@ -28,6 +28,7 @@ router.post('/contracts/:id/reject', authMiddleware, roleCheck(tenantRole), cont
 
 // Payments (View & Pay)
 router.get('/payments', authMiddleware, roleCheck(tenantRole), paymentController.getPayments);
+router.post('/payments/manual', authMiddleware, roleCheck(tenantRole), paymentController.createTenantManualPayment);
 // Payment creation/upload proof might be needed for tenants? Assuming tenants can upload proof?
 // The original route had uploadPaymentProof.
 router.post('/payments/:id/proof', authMiddleware, roleCheck(tenantRole), require('../../middlewares/upload').single('file'), require('../../middlewares/validatePaymentProof'), paymentController.uploadPaymentProof);

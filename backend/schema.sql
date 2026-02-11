@@ -10,7 +10,7 @@
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     full_name TEXT NOT NULL,
-    role TEXT CHECK (role IN ('admin', 'manager', 'staff', 'tenant')) DEFAULT 'tenant',
+    role TEXT CHECK (role IN ('admin', 'manager', 'tenant')) DEFAULT 'tenant',
     phone TEXT,
     avatar_url TEXT,
     preferred_language TEXT DEFAULT 'fr',
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- Biens immobiliers
 CREATE TABLE IF NOT EXISTS properties (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    owner_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     description TEXT,
     address TEXT NOT NULL,
@@ -51,6 +52,9 @@ CREATE TABLE IF NOT EXISTS properties (
 -- Ensure existing deployments have the price column even if the table already existed
 ALTER TABLE properties
     ADD COLUMN IF NOT EXISTS price DECIMAL(12, 2);
+
+ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
 -- Locataires
 CREATE TABLE IF NOT EXISTS tenants (
@@ -289,6 +293,7 @@ JOIN tenants t ON c.tenant_id = t.id;
 -- ============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_properties_status ON properties(status);
+CREATE INDEX IF NOT EXISTS idx_properties_owner_id ON properties(owner_id);
 CREATE INDEX IF NOT EXISTS idx_properties_city ON properties(city);
 CREATE INDEX IF NOT EXISTS idx_properties_type ON properties(type);
 CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
@@ -558,3 +563,4 @@ INSERT INTO properties (title, description, address, city, postal_code, surface,
 */
 
 COMMIT;
+

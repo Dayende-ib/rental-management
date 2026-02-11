@@ -20,7 +20,7 @@ const optionalAuth = require('../middlewares/optionalAuth');
  * @swagger
  * /api/properties:
  *   get:
- *     summary: Returns the list of properties (filtered for guests, all for staff)
+ *     summary: Returns the list of properties (filtered for guests, all for backoffice)
  *     tags: [Properties]
  *     responses:
  *       200:
@@ -59,51 +59,53 @@ router.get('/', optionalAuth, propertyController.getProperties);
  */
 router.get('/:id', propertyController.getPropertyById);
 
-const staffRoles = ['admin', 'manager', 'staff'];
+const backofficeRoles = ['admin', 'manager'];
 
 /**
  * @swagger
  * /api/properties:
  *   post:
- *     summary: Create a new property (Staff only)
+ *     summary: Create a new property (backoffice only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', authMiddleware, roleCheck(staffRoles), propertyController.createProperty);
+router.post('/', authMiddleware, roleCheck(backofficeRoles), propertyController.createProperty);
 
 /**
  * @swagger
  * /api/properties/{id}:
  *   put:
- *     summary: Update property by ID (Staff only)
+ *     summary: Update property by ID (backoffice only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
  */
-router.put('/:id', authMiddleware, roleCheck(staffRoles), propertyController.updateProperty);
+router.put('/:id', authMiddleware, roleCheck(backofficeRoles), propertyController.updateProperty);
 
 /**
  * @swagger
  * /api/properties/{id}/photos:
  *   post:
- *     summary: Upload a property photo (Staff only)
+ *     summary: Upload a property photo (backoffice only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/photos', authMiddleware, roleCheck(staffRoles), upload.single('file'), validatePaymentProof, propertyController.uploadPropertyPhoto);
+router.post('/:id/photos', authMiddleware, roleCheck(backofficeRoles), upload.single('file'), validatePaymentProof, propertyController.uploadPropertyPhoto);
 
 /**
  * @swagger
  * /api/properties/{id}:
  *   delete:
- *     summary: Remove property by ID (Staff only)
+ *     summary: Remove property by ID (backoffice only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', authMiddleware, roleCheck(staffRoles), propertyController.deleteProperty);
+router.delete('/:id', authMiddleware, roleCheck(backofficeRoles), propertyController.deleteProperty);
 
 
 module.exports = router;
+
+

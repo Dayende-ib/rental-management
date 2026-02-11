@@ -1,10 +1,10 @@
 # 🖥️ Rental Management Web Dashboard
 
-A powerful React-based Single Page Application (SPA) for property managers, staff, and administrators to oversee the rental business.
+A powerful React-based Single Page Application (SPA) for property managers and administrators to oversee the rental business.
 
 ## 🛠 Features
 
-- **Authenticated Dashboard**: Secure login for Admin/Manager/Staff roles.
+- **Authenticated Dashboard**: Secure login for Admin/Manager roles.
 - **Tenant Overview**: Manage tenant profiles, view contracts, and payment history.
 - **Property Management**: Create, update, and list rental properties. Upload photos.
 - **Contract Administration**: View contract details, status, and associated payments.
@@ -85,3 +85,4 @@ npm run build
 ```
 
 The output will be in the `dist/` directory, ready to be served by Nginx, Apache, or Vercel/Netlify.
+

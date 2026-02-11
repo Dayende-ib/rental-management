@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const createUserClient = require('../config/supabaseUser');
+const { parsePagination, parseSort, buildListResponse } = require('../utils/listQuery');
 
 /**
  * @swagger
@@ -28,13 +29,35 @@ const createUserClient = require('../config/supabaseUser');
 const getTenants = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
-        // Utiliser le client authentifié pour respecter la RLS
-        const { data, error } = await userClient
-            .from('tenants')
-            .select('*');
+        const pagination = parsePagination(req.query);
+        const { sortBy, sortOrder } = parseSort(
+            req.query,
+            ['created_at', 'updated_at', 'full_name', 'email'],
+            'created_at'
+        );
 
+        let query = userClient
+            .from('tenants')
+            .select('*')
+            .order(sortBy, { ascending: sortOrder === 'asc' });
+
+        if (pagination.enabled) {
+            query = query.range(pagination.from, pagination.to);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
-        res.status(200).json(data);
+
+        let total = null;
+        if (pagination.enabled) {
+            const { count, error: countError } = await userClient
+                .from('tenants')
+                .select('*', { count: 'exact', head: true });
+            if (countError) throw countError;
+            total = count;
+        }
+
+        res.status(200).json(buildListResponse(data || [], pagination, total));
     } catch (err) {
         next(err);
     }
@@ -44,34 +67,80 @@ const getCurrentTenant = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
         const userId = req.user && req.user.id ? req.user.id : null;
-        const email = req.user && req.user.email ? req.user.email : null;
+        const email = req.user && req.user.email ? String(req.user.email).trim().toLowerCase() : null;
 
-        let data = [];
+        let rows = [];
         let error = null;
 
         if (userId) {
             const result = await userClient
                 .from('tenants')
                 .select('*')
-                .eq('id', userId)
+                .eq('user_id', userId)
                 .limit(1);
-            data = result.data || [];
+            rows = result.data || [];
             error = result.error;
         }
 
-        if ((!data || !data.length) && email) {
+        if ((!rows || !rows.length) && email) {
             const result = await userClient
                 .from('tenants')
                 .select('*')
                 .eq('email', email)
                 .limit(1);
-            data = result.data || [];
+            rows = result.data || [];
             error = result.error;
         }
 
         if (error) throw error;
-        if (!data || !data.length) return res.status(404).json({ error: 'Tenant not found' });
-        res.status(200).json(data[0]);
+
+        let tenant = rows && rows.length ? rows[0] : null;
+
+        // Enrich/fallback with profile data so mobile always gets a usable full_name.
+        let profile = null;
+        if (userId) {
+            const profileResult = await userClient
+                .from('profiles')
+                .select('full_name, phone')
+                .eq('id', userId)
+                .maybeSingle();
+            if (profileResult.error) throw profileResult.error;
+            profile = profileResult.data || null;
+        }
+
+        if (tenant) {
+            const needsName = !String(tenant.full_name || '').trim();
+            const needsPhone = !String(tenant.phone || '').trim() && String(profile?.phone || '').trim();
+            if ((needsName && String(profile?.full_name || '').trim()) || needsPhone) {
+                const patch = {};
+                if (needsName && String(profile?.full_name || '').trim()) {
+                    patch.full_name = String(profile.full_name).trim();
+                    tenant.full_name = patch.full_name;
+                }
+                if (needsPhone) {
+                    patch.phone = String(profile.phone).trim();
+                    tenant.phone = patch.phone;
+                }
+                // Best effort sync, non-blocking for response.
+                if (Object.keys(patch).length > 0) {
+                    await userClient.from('tenants').update(patch).eq('id', tenant.id);
+                }
+            }
+            return res.status(200).json(tenant);
+        }
+
+        // If tenant row doesn't exist yet, return profile-based fallback.
+        if (profile) {
+            return res.status(200).json({
+                id: userId,
+                user_id: userId,
+                full_name: String(profile.full_name || '').trim(),
+                email: email || '',
+                phone: String(profile.phone || '').trim(),
+            });
+        }
+
+        return res.status(404).json({ error: 'Tenant not found' });
     } catch (err) {
         next(err);
     }

@@ -15,7 +15,7 @@ final databaseHelperProvider = Provider<DatabaseHelper>((ref) {
 });
 
 /// Payments provider with offline support
-final paymentsProvider = FutureProvider<List<Payment>>((ref) async {
+final paymentsProvider = FutureProvider.autoDispose<List<Payment>>((ref) async {
   final paymentService = ref.watch(paymentServiceProvider);
   final dbHelper = ref.watch(databaseHelperProvider);
   final connectivityService = ref.watch(connectivityServiceProvider);

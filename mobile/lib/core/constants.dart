@@ -52,11 +52,13 @@ class AppConstants {
   static const String tokenKey = 'jwt_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
+  static const String userFullNameKey = 'user_full_name';
+  static const String userEmailKey = 'user_email';
   static const String customBaseUrlKey = 'custom_base_url';
   static const String lastLoginKey = 'last_login_date';
 
   // App Configuration
-  static const String appName = 'Rental Management';
+  static const String appName = 'PropiFlow';
   static const int apiTimeoutSeconds = 30;
 
   // UI Constants

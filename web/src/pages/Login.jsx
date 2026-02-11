@@ -3,6 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import { Building2, LogIn, Mail, Lock, ArrowRight, Eye, EyeOff, Sparkles } from "lucide-react";
 
+const WEB_ALLOWED_ROLES = ["admin", "manager"];
+
 export default function ImprovedLogin() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -15,11 +17,27 @@ export default function ImprovedLogin() {
   const [focusedField, setFocusedField] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      console.log("Token trouvé (Login), redirection vers dashboard...");
-      navigate("/dashboard");
-    }
+    const bootstrap = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        const res = await api.get("/auth/profile");
+        const role = String(res.data?.role || "");
+        if (!WEB_ALLOWED_ROLES.includes(role)) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setError("Les comptes locataires doivent utiliser l'application mobile.");
+          return;
+        }
+        navigate("/dashboard");
+      } catch {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    };
+
+    bootstrap();
   }, [navigate]);
 
   const handleSubmit = async (e) => {
@@ -33,6 +51,16 @@ export default function ImprovedLogin() {
       if (res.data.session?.access_token) {
         localStorage.setItem("token", res.data.session.access_token);
         localStorage.setItem("user", JSON.stringify(res.data.user));
+
+        const profileRes = await api.get("/auth/profile");
+        const role = String(profileRes.data?.role || "");
+        if (!WEB_ALLOWED_ROLES.includes(role)) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setError("Connexion refusee: les comptes locataires ne sont pas autorises sur le web.");
+          return;
+        }
+
         navigate("/dashboard");
       } else {
         setError("Connexion reussie, mais session manquante.");
@@ -168,9 +196,9 @@ export default function ImprovedLogin() {
                 {error && (
                   <div className="p-4 border-2 border-red-200 bg-red-50 rounded-2xl animate-shake">
                     <p className="flex items-center gap-2 text-sm font-medium text-red-800">
-                      <div className="flex items-center justify-center flex-shrink-0 w-5 h-5 bg-red-200 rounded-full">
+                      <span className="flex items-center justify-center flex-shrink-0 w-5 h-5 bg-red-200 rounded-full">
                         <span className="text-xs text-red-600">!</span>
-                      </div>
+                      </span>
                       {error}
                     </p>
                   </div>
@@ -238,6 +266,7 @@ export default function ImprovedLogin() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#1C9B7E] transition-colors"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -318,3 +347,4 @@ export default function ImprovedLogin() {
     </div>
   );
 }
+

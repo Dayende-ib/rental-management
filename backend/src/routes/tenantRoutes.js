@@ -12,13 +12,13 @@ const roleCheck = require('../middlewares/roleCheck');
  *   description: Tenant management API
  */
 
-const staffRoles = ['admin', 'manager', 'staff'];
+const backofficeRoles = ['admin', 'manager'];
 
 /**
  * @swagger
  * /api/tenants:
  *   get:
- *     summary: Returns the list of all tenants (Staff only)
+ *     summary: Returns the list of all tenants (backoffice only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -28,7 +28,7 @@ const staffRoles = ['admin', 'manager', 'staff'];
  *       403:
  *         description: Forbidden
  */
-router.get('/', authMiddleware, roleCheck(staffRoles), tenantController.getTenants);
+router.get('/', authMiddleware, roleCheck(backofficeRoles), tenantController.getTenants);
 
 /**
  * @swagger
@@ -48,7 +48,7 @@ router.get('/me', authMiddleware, tenantController.getCurrentTenant);
  * @swagger
  * /api/tenants/{id}:
  *   get:
- *     summary: Get tenant by ID (Staff or Owner only)
+ *     summary: Get tenant by ID (backoffice or Owner only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -59,40 +59,42 @@ router.get('/me', authMiddleware, tenantController.getCurrentTenant);
  *         schema:
  *           type: string
  */
-router.get('/:id', authMiddleware, roleCheck(staffRoles), tenantController.getTenantById);
+router.get('/:id', authMiddleware, roleCheck(backofficeRoles), tenantController.getTenantById);
 
 /**
  * @swagger
  * /api/tenants:
  *   post:
- *     summary: Create a new tenant (Staff only)
+ *     summary: Create a new tenant (backoffice only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', authMiddleware, roleCheck(staffRoles), tenantController.createTenant);
+router.post('/', authMiddleware, roleCheck(backofficeRoles), tenantController.createTenant);
 
 /**
  * @swagger
  * /api/tenants/{id}:
  *   put:
- *     summary: Update tenant (Staff only)
+ *     summary: Update tenant (backoffice only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
  */
-router.put('/:id', authMiddleware, roleCheck(staffRoles), tenantController.updateTenant);
+router.put('/:id', authMiddleware, roleCheck(backofficeRoles), tenantController.updateTenant);
 
 /**
  * @swagger
  * /api/tenants/{id}:
  *   delete:
- *     summary: Delete tenant (Staff only)
+ *     summary: Delete tenant (backoffice only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', authMiddleware, roleCheck(staffRoles), tenantController.deleteTenant);
+router.delete('/:id', authMiddleware, roleCheck(backofficeRoles), tenantController.deleteTenant);
 
 module.exports = router;
+
+
 

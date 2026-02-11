@@ -17,7 +17,7 @@ class Tenant {
 
   factory Tenant.fromJson(Map<String, dynamic> json) {
     return Tenant(
-      id: json['id'] as String,
+      id: (json['id'] ?? json['user_id'] ?? '').toString(),
       name: (json['full_name'] ?? json['name'] ?? '').toString(),
       email: (json['email'] ?? '').toString(),
       phone: (json['phone'] ?? '').toString(),
@@ -68,7 +68,7 @@ class Property {
     }
 
     return Property(
-      id: json['id'] as String,
+      id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? json['address'] ?? '').toString(),
       address: (json['address'] ?? json['title'] ?? '').toString(),
       city: (json['city'] ?? '').toString(),
@@ -146,7 +146,7 @@ class Payment {
         ?.toString();
 
     return Payment(
-      id: json['id'] as String,
+      id: (json['id'] ?? '').toString(),
       contractId: (json['contract_id'] ?? '').toString(),
       month: month,
       amount: _parseDouble(json['amount']),
@@ -203,7 +203,7 @@ class MaintenanceRequest {
 
   factory MaintenanceRequest.fromJson(Map<String, dynamic> json) {
     return MaintenanceRequest(
-      id: json['id'] as String,
+      id: (json['id'] ?? '').toString(),
       propertyId: (json['property_id'] ?? '').toString(),
       description: json['description'] as String,
       status: json['status'] as String,

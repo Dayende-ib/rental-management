@@ -8,19 +8,24 @@ import '../core/constants.dart';
 class MaintenanceListScreen extends ConsumerWidget {
   const MaintenanceListScreen({super.key});
 
+  Future<void> _openCreateScreen(BuildContext context, WidgetRef ref) async {
+    final created = await Navigator.pushNamed(context, '/create-maintenance');
+    if (created == true) {
+      ref.invalidate(maintenanceRequestsProvider);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final requestsAsync = ref.watch(maintenanceRequestsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mes Demandes'),
+        title: const Text('Mes demandes'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.pushNamed(context, '/create-maintenance');
-            },
+            onPressed: () => _openCreateScreen(context, ref),
           ),
         ],
       ),
@@ -30,7 +35,7 @@ class MaintenanceListScreen extends ConsumerWidget {
             ref.invalidate(maintenanceRequestsProvider);
           },
           child: requests.isEmpty
-              ? _buildEmptyState(context)
+              ? _buildEmptyState(context, ref)
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.all(AppConstants.defaultPadding),
@@ -51,22 +56,21 @@ class MaintenanceListScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref.invalidate(maintenanceRequestsProvider),
-                child: const Text('Réessayer'),
+                child: const Text('Reessayer'),
               ),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, '/create-maintenance'),
+        onPressed: () => _openCreateScreen(context, ref),
         icon: const Icon(Icons.add),
         label: const Text('Nouvelle demande'),
       ),
     );
   }
 
-  /// Build empty state when no maintenance requests
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -79,23 +83,20 @@ class MaintenanceListScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Commencez par créer une nouvelle demande',
+            'Commencez par creer une nouvelle demande',
             style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           OutlinedButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/create-maintenance');
-            },
-            child: const Text('Créer une demande'),
+            onPressed: () => _openCreateScreen(context, ref),
+            child: const Text('Creer une demande'),
           ),
         ],
       ),
     );
   }
 
-  /// Build maintenance request card
   Widget _buildMaintenanceCard(
     BuildContext context,
     MaintenanceRequest request,
@@ -202,7 +203,7 @@ class MaintenanceListScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Créé le: ${_formatDateTime(request.createdAt)}',
+                    'Cree le: ${_formatDateTime(request.createdAt)}',
                     style: const TextStyle(color: Colors.grey),
                   ),
                 ],
@@ -214,7 +215,7 @@ class MaintenanceListScreen extends ConsumerWidget {
                     const Icon(Icons.update, size: 16, color: Colors.grey),
                     const SizedBox(width: 8),
                     Text(
-                      'Mis à jour: ${_formatDateTime(request.updatedAt!)}',
+                      'Mis a jour: ${_formatDateTime(request.updatedAt!)}',
                       style: const TextStyle(color: Colors.grey),
                     ),
                   ],
@@ -227,9 +228,8 @@ class MaintenanceListScreen extends ConsumerWidget {
     );
   }
 
-  /// Format datetime for display
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} '
-        'à ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        'a ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
