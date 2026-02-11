@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import { Building2, UserPlus, Mail, Lock, User, ArrowRight, Eye, EyeOff, Sparkles, Check } from "lucide-react";
@@ -16,6 +16,14 @@ export default function ImprovedRegister() {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      console.log("Token trouvé, redirection vers dashboard...");
+      navigate("/dashboard");
+    }
+  }, [navigate]);
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
@@ -38,9 +46,21 @@ export default function ImprovedRegister() {
     setLoading(true);
 
     try {
-      await api.post("/auth/register", formData);
-      navigate("/");
+      console.log("Inscription en cours...");
+      const res = await api.post("/auth/register", formData);
+      console.log("Reponse API:", res.data);
+
+      if (res.data.session?.access_token) {
+        localStorage.setItem("token", res.data.session.access_token);
+        localStorage.setItem("user", JSON.stringify(res.data.user || {}));
+        console.log("Navigation vers dashboard...");
+        navigate("/dashboard");
+      } else {
+        console.log("Pas de session, redirection vers login...");
+        navigate("/");
+      }
     } catch (err) {
+      console.error("Erreur Inscription:", err);
       setError(
         err.response?.data?.error ||
         "Echec de l'inscription. Veuillez reessayer."
@@ -208,11 +228,10 @@ export default function ImprovedRegister() {
                       required
                       minLength={3}
                       placeholder="Jean Dupont"
-                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${
-                        focusedField === 'name'
-                          ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
-                          : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${focusedField === 'name'
+                        ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                        }`}
                       value={formData.full_name}
                       onChange={(e) =>
                         setFormData({ ...formData, full_name: e.target.value })
@@ -220,11 +239,10 @@ export default function ImprovedRegister() {
                       onFocus={() => setFocusedField('name')}
                       onBlur={() => setFocusedField(null)}
                     />
-                    <User 
-                      size={18} 
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${
-                        focusedField === 'name' ? 'text-[#1C9B7E]' : 'text-gray-400'
-                      }`}
+                    <User
+                      size={18}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'name' ? 'text-[#1C9B7E]' : 'text-gray-400'
+                        }`}
                     />
                   </div>
                 </div>
@@ -240,11 +258,10 @@ export default function ImprovedRegister() {
                       type="email"
                       required
                       placeholder="exemple@email.com"
-                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${
-                        focusedField === 'email'
-                          ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
-                          : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${focusedField === 'email'
+                        ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                        }`}
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
@@ -252,11 +269,10 @@ export default function ImprovedRegister() {
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
                     />
-                    <Mail 
-                      size={18} 
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${
-                        focusedField === 'email' ? 'text-[#1C9B7E]' : 'text-gray-400'
-                      }`}
+                    <Mail
+                      size={18}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'email' ? 'text-[#1C9B7E]' : 'text-gray-400'
+                        }`}
                     />
                   </div>
                 </div>
@@ -273,21 +289,19 @@ export default function ImprovedRegister() {
                       required
                       minLength={6}
                       placeholder="••••••••"
-                      className={`w-full px-4 py-3.5 pl-12 pr-12 border-2 rounded-2xl transition-all duration-300 outline-none ${
-                        focusedField === 'password'
-                          ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
-                          : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3.5 pl-12 pr-12 border-2 rounded-2xl transition-all duration-300 outline-none ${focusedField === 'password'
+                        ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                        }`}
                       value={formData.password}
                       onChange={(e) => handlePasswordChange(e.target.value)}
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
                     />
-                    <Lock 
-                      size={18} 
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${
-                        focusedField === 'password' ? 'text-[#1C9B7E]' : 'text-gray-400'
-                      }`}
+                    <Lock
+                      size={18}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'password' ? 'text-[#1C9B7E]' : 'text-gray-400'
+                        }`}
                     />
                     <button
                       type="button"
@@ -297,7 +311,7 @@ export default function ImprovedRegister() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  
+
                   {/* Password strength indicator */}
                   {formData.password && (
                     <div className="space-y-2">
@@ -305,9 +319,8 @@ export default function ImprovedRegister() {
                         {[1, 2, 3, 4].map((level) => (
                           <div
                             key={level}
-                            className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                              level <= passwordStrength ? getStrengthColor() : 'bg-gray-200'
-                            }`}
+                            className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${level <= passwordStrength ? getStrengthColor() : 'bg-gray-200'
+                              }`}
                           />
                         ))}
                       </div>
@@ -315,9 +328,9 @@ export default function ImprovedRegister() {
                         <p className="text-xs font-medium text-gray-600">
                           Force du mot de passe: <span className={
                             passwordStrength === 1 ? 'text-red-600' :
-                            passwordStrength === 2 ? 'text-orange-600' :
-                            passwordStrength === 3 ? 'text-yellow-600' :
-                            'text-green-600'
+                              passwordStrength === 2 ? 'text-orange-600' :
+                                passwordStrength === 3 ? 'text-yellow-600' :
+                                  'text-green-600'
                           }>{getStrengthText()}</span>
                         </p>
                       )}
@@ -348,7 +361,7 @@ export default function ImprovedRegister() {
                 >
                   {/* Button shimmer effect */}
                   <div className="absolute inset-0 transition-transform duration-1000 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full" />
-                  
+
                   <div className="relative flex items-center justify-center gap-3">
                     {loading ? (
                       <>

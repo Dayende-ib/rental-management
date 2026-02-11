@@ -5,6 +5,8 @@ import '../screens/payments_screen.dart';
 import '../screens/maintenance_list_screen.dart';
 import '../screens/profile_screen.dart';
 
+import '../widgets/connectivity_banner.dart';
+
 /// Navigation state provider
 final navigationIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -24,7 +26,15 @@ class MainNavigationScreen extends ConsumerWidget {
     final currentIndex = ref.watch(navigationIndexProvider);
 
     return Scaffold(
-      body: IndexedStack(index: currentIndex, children: _screens),
+      body: Column(
+        children: [
+          const ConnectivityBanner(),
+          Expanded(
+            child: IndexedStack(index: currentIndex, children: _screens),
+          ),
+        ],
+      ),
+
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: currentIndex,

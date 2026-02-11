@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -30,7 +31,8 @@ const supabase = require('../config/supabase');
 const getMaintenanceRequests = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('maintenance_requests')
             .select('*, properties(title)')
             .eq('tenant_id', userId);
@@ -44,7 +46,8 @@ const getMaintenanceRequests = async (req, res, next) => {
 
 const createMaintenanceRequest = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('maintenance_requests')
             .insert([req.body])
             .select();
@@ -59,7 +62,8 @@ const createMaintenanceRequest = async (req, res, next) => {
 const updateMaintenanceRequest = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('maintenance_requests')
             .update(req.body)
             .eq('id', id)

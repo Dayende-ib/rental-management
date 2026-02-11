@@ -34,12 +34,20 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use('/api/properties', require('./routes/propertyRoutes'));
-app.use('/api/tenants', require('./routes/tenantRoutes'));
-app.use('/api/contracts', require('./routes/contractRoutes'));
-app.use('/api/payments', require('./routes/paymentRoutes'));
-app.use('/api/maintenance', require('./routes/maintenanceRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
+
+// Web Routes (Admin, Manager, Staff)
+app.use('/api/web', require('./routes/web/index'));
+
+// Mobile Routes (Tenant)
+app.use('/api/mobile', require('./routes/mobile/index'));
+
+// Legacy/Shared Routes (au cas où, mais idéalement à migrer)
+// app.use('/api/properties', require('./routes/propertyRoutes'));
+// app.use('/api/tenants', require('./routes/tenantRoutes'));
+// app.use('/api/contracts', require('./routes/contractRoutes'));
+// app.use('/api/payments', require('./routes/paymentRoutes'));
+// app.use('/api/maintenance', require('./routes/maintenanceRoutes'));
 
 // Health Check
 app.get('/health', (req, res) => {

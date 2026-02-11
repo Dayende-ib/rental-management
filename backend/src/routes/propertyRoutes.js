@@ -4,6 +4,10 @@ const propertyController = require('../controllers/propertyController');
 const authMiddleware = require('../middlewares/auth');
 const validatePaymentProof = require('../middlewares/validatePaymentProof');
 const upload = require('../middlewares/upload');
+const roleCheck = require('../middlewares/roleCheck');
+
+
+const optionalAuth = require('../middlewares/optionalAuth');
 
 /**
  * @swagger
@@ -16,7 +20,7 @@ const upload = require('../middlewares/upload');
  * @swagger
  * /api/properties:
  *   get:
- *     summary: Returns the list of all the properties
+ *     summary: Returns the list of properties (filtered for guests, all for staff)
  *     tags: [Properties]
  *     responses:
  *       200:
@@ -28,7 +32,8 @@ const upload = require('../middlewares/upload');
  *               items:
  *                 $ref: '#/components/schemas/Property'
  */
-router.get('/', propertyController.getProperties);
+router.get('/', optionalAuth, propertyController.getProperties);
+
 
 /**
  * @swagger
@@ -54,123 +59,51 @@ router.get('/', propertyController.getProperties);
  */
 router.get('/:id', propertyController.getPropertyById);
 
+const staffRoles = ['admin', 'manager', 'staff'];
+
 /**
  * @swagger
  * /api/properties:
  *   post:
- *     summary: Create a new property
+ *     summary: Create a new property (Staff only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Property'
- *     responses:
- *       201:
- *         description: The property was successfully created
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Property'
- *       401:
- *         description: Unauthorized
  */
-router.post('/', authMiddleware, propertyController.createProperty);
+router.post('/', authMiddleware, roleCheck(staffRoles), propertyController.createProperty);
 
 /**
  * @swagger
  * /api/properties/{id}:
  *   put:
- *     summary: Update property by ID
+ *     summary: Update property by ID (Staff only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Property'
- *     responses:
- *       200:
- *         description: The property was updated
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Property'
- *       404:
- *         description: Property not found
- *       401:
- *         description: Unauthorized
  */
-router.put('/:id', authMiddleware, propertyController.updateProperty);
+router.put('/:id', authMiddleware, roleCheck(staffRoles), propertyController.updateProperty);
 
 /**
  * @swagger
  * /api/properties/{id}/photos:
  *   post:
- *     summary: Upload a property photo (base64)
+ *     summary: Upload a property photo (Staff only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required: [file]
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Photo uploaded
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
  */
-router.post('/:id/photos', authMiddleware, upload.single('file'), validatePaymentProof, propertyController.uploadPropertyPhoto);
+router.post('/:id/photos', authMiddleware, roleCheck(staffRoles), upload.single('file'), validatePaymentProof, propertyController.uploadPropertyPhoto);
 
 /**
  * @swagger
  * /api/properties/{id}:
  *   delete:
- *     summary: Remove property by ID
+ *     summary: Remove property by ID (Staff only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       204:
- *         description: The property was deleted
- *       404:
- *         description: Property not found
- *       401:
- *         description: Unauthorized
  */
-router.delete('/:id', authMiddleware, propertyController.deleteProperty);
+router.delete('/:id', authMiddleware, roleCheck(staffRoles), propertyController.deleteProperty);
+
 
 module.exports = router;

@@ -13,8 +13,11 @@ class ConnectivityService {
 
   /// Stream of connectivity changes
   Stream<bool> get connectivityStream {
-    return _connectivity.onConnectivityChanged.map((result) {
-      return result != ConnectivityResult.none;
+    return _connectivity.onConnectivityChanged.map((dynamic results) {
+      if (results is List) {
+        return results.any((r) => r != ConnectivityResult.none);
+      }
+      return results != ConnectivityResult.none;
     });
   }
 }

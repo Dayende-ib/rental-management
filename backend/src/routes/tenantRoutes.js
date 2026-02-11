@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const tenantController = require('../controllers/tenantController');
 const authMiddleware = require('../middlewares/auth');
+const roleCheck = require('../middlewares/roleCheck');
+
 
 /**
  * @swagger
@@ -10,25 +12,23 @@ const authMiddleware = require('../middlewares/auth');
  *   description: Tenant management API
  */
 
+const staffRoles = ['admin', 'manager', 'staff'];
+
 /**
  * @swagger
  * /api/tenants:
  *   get:
- *     summary: Returns the list of all tenants
+ *     summary: Returns the list of all tenants (Staff only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: The list of tenants
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Tenant'
+ *       403:
+ *         description: Forbidden
  */
-router.get('/', authMiddleware, tenantController.getTenants);
+router.get('/', authMiddleware, roleCheck(staffRoles), tenantController.getTenants);
 
 /**
  * @swagger
@@ -41,8 +41,6 @@ router.get('/', authMiddleware, tenantController.getTenants);
  *     responses:
  *       200:
  *         description: Current tenant profile
- *       404:
- *         description: Tenant not found
  */
 router.get('/me', authMiddleware, tenantController.getCurrentTenant);
 
@@ -50,7 +48,7 @@ router.get('/me', authMiddleware, tenantController.getCurrentTenant);
  * @swagger
  * /api/tenants/{id}:
  *   get:
- *     summary: Get tenant by ID
+ *     summary: Get tenant by ID (Staff or Owner only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -60,82 +58,41 @@ router.get('/me', authMiddleware, tenantController.getCurrentTenant);
  *         required: true
  *         schema:
  *           type: string
- *     responses:
- *       200:
- *         description: Tenant details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Tenant'
- *       404:
- *         description: Tenant not found
  */
-router.get('/:id', authMiddleware, tenantController.getTenantById);
+router.get('/:id', authMiddleware, roleCheck(staffRoles), tenantController.getTenantById);
 
 /**
  * @swagger
  * /api/tenants:
  *   post:
- *     summary: Create a new tenant
+ *     summary: Create a new tenant (Staff only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Tenant'
- *     responses:
- *       201:
- *         description: Tenant created
  */
-router.post('/', authMiddleware, tenantController.createTenant);
+router.post('/', authMiddleware, roleCheck(staffRoles), tenantController.createTenant);
 
 /**
  * @swagger
  * /api/tenants/{id}:
  *   put:
- *     summary: Update tenant
+ *     summary: Update tenant (Staff only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Tenant'
- *     responses:
- *       200:
- *         description: Tenant updated
  */
-router.put('/:id', authMiddleware, tenantController.updateTenant);
+router.put('/:id', authMiddleware, roleCheck(staffRoles), tenantController.updateTenant);
 
 /**
  * @swagger
  * /api/tenants/{id}:
  *   delete:
- *     summary: Delete tenant
+ *     summary: Delete tenant (Staff only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       204:
- *         description: Tenant deleted
  */
-router.delete('/:id', authMiddleware, tenantController.deleteTenant);
+router.delete('/:id', authMiddleware, roleCheck(staffRoles), tenantController.deleteTenant);
 
 module.exports = router;
+

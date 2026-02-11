@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -36,7 +37,8 @@ const supabase = require('../config/supabase');
 const getContracts = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('contracts')
             .select('*, properties(title)')
             .eq('tenant_id', userId);
@@ -51,7 +53,8 @@ const getContracts = async (req, res, next) => {
 const getContractById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('contracts')
             .select('*, properties(title)')
             .eq('id', id)
@@ -68,9 +71,10 @@ const getContractById = async (req, res, next) => {
 const createContract = async (req, res, next) => {
     try {
         const { property_id, tenant_id } = req.body;
+        const userClient = createUserClient(req.token);
 
         // 1. Check if the property is available
-        const { data: property, error: propertyError } = await supabase
+        const { data: property, error: propertyError } = await userClient
             .from('properties')
             .select('status')
             .eq('id', property_id)
@@ -84,7 +88,7 @@ const createContract = async (req, res, next) => {
         }
 
         // 2. Create the contract
-        const { data: contract, error: contractError } = await supabase
+        const { data: contract, error: contractError } = await userClient
             .from('contracts')
             .insert([{ ...req.body, status: 'active' }])
             .select();
@@ -92,7 +96,7 @@ const createContract = async (req, res, next) => {
         if (contractError) throw contractError;
 
         // 3. Update property status to 'rented'
-        const { error: updateError } = await supabase
+        const { error: updateError } = await userClient
             .from('properties')
             .update({ status: 'rented' })
             .eq('id', property_id);
@@ -108,7 +112,8 @@ const createContract = async (req, res, next) => {
 const updateContract = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('contracts')
             .update(req.body)
             .eq('id', id)
@@ -125,9 +130,10 @@ const updateContract = async (req, res, next) => {
 const deleteContract = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const userClient = createUserClient(req.token);
 
         // 1. Fetch contract to get property_id
-        const { data: contract, error: fetchError } = await supabase
+        const { data: contract, error: fetchError } = await userClient
             .from('contracts')
             .select('property_id')
             .eq('id', id)
@@ -136,7 +142,7 @@ const deleteContract = async (req, res, next) => {
         if (fetchError) throw fetchError;
 
         // 2. Delete the contract
-        const { error } = await supabase
+        const { error } = await userClient
             .from('contracts')
             .delete()
             .eq('id', id);
@@ -145,7 +151,7 @@ const deleteContract = async (req, res, next) => {
 
         // 3. Set property back to 'available' if contract existed
         if (contract) {
-            await supabase
+            await userClient
                 .from('properties')
                 .update({ status: 'available' })
                 .eq('id', contract.property_id);

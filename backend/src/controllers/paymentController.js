@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -31,7 +32,8 @@ const supabase = require('../config/supabase');
 const getPayments = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('payments')
             .select('*, contracts!inner(id, tenant_id)')
             .eq('contracts.tenant_id', userId);
@@ -45,7 +47,8 @@ const getPayments = async (req, res, next) => {
 
 const createPayment = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('payments')
             .insert([req.body])
             .select();
@@ -60,7 +63,8 @@ const createPayment = async (req, res, next) => {
 const updatePayment = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('payments')
             .update(req.body)
             .eq('id', id)
@@ -78,6 +82,7 @@ const uploadPaymentProof = async (req, res, next) => {
     try {
         const { id } = req.params;
         const file = req.file;
+        const userClient = createUserClient(req.token);
 
         if (!file) {
             return res.status(400).json({ error: 'Missing file upload' });
@@ -94,18 +99,18 @@ const uploadPaymentProof = async (req, res, next) => {
         // upload to supabase storage (bucket: payment-proofs)
         const bucket = 'payment-proofs';
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await userClient.storage
             .from(bucket)
             .upload(filename, buffer, { contentType: mimeType, upsert: true });
 
         if (uploadError) throw uploadError;
 
         // get public url
-        const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(filename);
+        const { data: publicData } = userClient.storage.from(bucket).getPublicUrl(filename);
         const publicUrl = publicData && publicData.publicUrl ? publicData.publicUrl : null;
 
         // update payment record with proof url
-        const { data, error } = await supabase
+        const { data, error } = await userClient
             .from('payments')
             .update({ proof_url: publicUrl })
             .eq('id', id)

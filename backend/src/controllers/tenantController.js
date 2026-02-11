@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -26,7 +27,9 @@ const supabase = require('../config/supabase');
 
 const getTenants = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        // Utiliser le client authentifié pour respecter la RLS
+        const { data, error } = await userClient
             .from('tenants')
             .select('*');
 
@@ -39,6 +42,7 @@ const getTenants = async (req, res, next) => {
 
 const getCurrentTenant = async (req, res, next) => {
     try {
+        const userClient = createUserClient(req.token);
         const userId = req.user && req.user.id ? req.user.id : null;
         const email = req.user && req.user.email ? req.user.email : null;
 
@@ -46,7 +50,7 @@ const getCurrentTenant = async (req, res, next) => {
         let error = null;
 
         if (userId) {
-            const result = await supabase
+            const result = await userClient
                 .from('tenants')
                 .select('*')
                 .eq('id', userId)
@@ -56,7 +60,7 @@ const getCurrentTenant = async (req, res, next) => {
         }
 
         if ((!data || !data.length) && email) {
-            const result = await supabase
+            const result = await userClient
                 .from('tenants')
                 .select('*')
                 .eq('email', email)
@@ -76,7 +80,8 @@ const getCurrentTenant = async (req, res, next) => {
 const getTenantById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('tenants')
             .select('*')
             .eq('id', id)
@@ -92,7 +97,8 @@ const getTenantById = async (req, res, next) => {
 
 const createTenant = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('tenants')
             .insert([req.body])
             .select();
@@ -107,7 +113,8 @@ const createTenant = async (req, res, next) => {
 const updateTenant = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('tenants')
             .update(req.body)
             .eq('id', id)
@@ -124,7 +131,8 @@ const updateTenant = async (req, res, next) => {
 const deleteTenant = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { error } = await userClient
             .from('tenants')
             .delete()
             .eq('id', id);

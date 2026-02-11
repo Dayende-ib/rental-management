@@ -10,9 +10,11 @@
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     full_name TEXT NOT NULL,
-    role TEXT CHECK (role IN ('admin', 'manager', 'staff', 'tenant')) DEFAULT 'staff',
+    role TEXT CHECK (role IN ('admin', 'manager', 'staff', 'tenant')) DEFAULT 'tenant',
     phone TEXT,
     avatar_url TEXT,
+    preferred_language TEXT DEFAULT 'fr',
+    theme TEXT DEFAULT 'light',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS properties (
     status TEXT CHECK (status IN ('available', 'rented', 'maintenance', 'sold')) DEFAULT 'available',
     energy_rating TEXT CHECK (energy_rating IN ('A', 'B', 'C', 'D', 'E', 'F', 'G')),
     year_built INTEGER,
+    featured_image TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -70,6 +73,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     guarantor_full_name TEXT,
     guarantor_email TEXT,
     guarantor_phone TEXT,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -455,6 +459,10 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
+
+-- AUTOMATISATION (Requiert l'extension pg_cron sur Supabase)
+-- SELECT cron.schedule('0 0 1 * *', 'SELECT generate_monthly_payments()');
+
 
 -- ============================================================================
 -- CONFIGURATION STORAGE

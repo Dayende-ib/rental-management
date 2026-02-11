@@ -5,9 +5,12 @@ import 'package:rental_management/screens/register_screen.dart';
 import 'package:rental_management/screens/guest_properties_screen.dart';
 import 'package:rental_management/screens/maintenance_list_screen.dart';
 import 'package:rental_management/screens/create_maintenance_screen.dart';
+import 'package:rental_management/screens/maintenance_detail_screen.dart';
 import 'package:rental_management/navigation/main_navigation_screen.dart';
 import 'package:rental_management/screens/settings_debug_screen.dart';
+import 'package:rental_management/core/models.dart';
 import 'package:rental_management/core/constants.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 
 /// Main application widget with routing configuration
@@ -72,6 +75,13 @@ class _RentalAppState extends State<RentalApp> {
           builder: (_) => const CreateMaintenanceScreen(),
           settings: settings,
         );
+      case '/maintenance-detail':
+        final request = settings.arguments as MaintenanceRequest;
+        return MaterialPageRoute(
+          builder: (_) => MaintenanceDetailScreen(request: request),
+          settings: settings,
+        );
+
       case '/debug-settings':
         return MaterialPageRoute(
           builder: (_) => const SettingsDebugScreen(),

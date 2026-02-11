@@ -50,10 +50,19 @@ const createUserClient = require('../config/supabaseUser');
 
 const getProperties = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
-            .from('properties')
-            .select('*')
-            .eq('status', 'available');
+        console.log('Fetching properties for user:', req.user);
+        const userClient = createUserClient(req.token);
+        let query = userClient.from('properties').select('*');
+
+        // Les invités et les locataires ne voient que les biens disponibles
+        // Le staff, admin et manager voient tout
+        const isStaff = req.user && ['admin', 'manager', 'staff'].includes(req.user.role);
+
+        if (!isStaff) {
+            query = query.eq('status', 'available');
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         res.status(200).json(data);
@@ -65,7 +74,8 @@ const getProperties = async (req, res, next) => {
 const getPropertyById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('properties')
             .select('*')
             .eq('id', id)
@@ -81,7 +91,8 @@ const getPropertyById = async (req, res, next) => {
 
 const createProperty = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('properties')
             .insert([req.body])
             .select();
@@ -96,7 +107,8 @@ const createProperty = async (req, res, next) => {
 const updateProperty = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('properties')
             .update(req.body)
             .eq('id', id)
@@ -113,7 +125,8 @@ const updateProperty = async (req, res, next) => {
 const deleteProperty = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { error } = await userClient
             .from('properties')
             .delete()
             .eq('id', id);

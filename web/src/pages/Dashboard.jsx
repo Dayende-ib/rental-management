@@ -41,6 +41,9 @@ export default function Dashboard() {
   const [ownerMap, setOwnerMap] = useState({});
   const [loading, setLoading] = useState(true);
 
+  const [occupancyRate, setOccupancyRate] = useState(0);
+  const [totalYield, setTotalYield] = useState(0);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -65,6 +68,10 @@ export default function Dashboard() {
         const tenants = Array.isArray(tenantsRes?.data) ? tenantsRes.data : [];
         const payments = Array.isArray(paymentsRes?.data) ? paymentsRes.data : [];
         const maintenance = Array.isArray(maintenanceRes?.data) ? maintenanceRes.data : [];
+
+        // Calcul de l'occupation
+        const rentedCount = properties.filter(p => p.status === 'rented').length;
+        setOccupancyRate(properties.length > 0 ? (rentedCount / properties.length) * 100 : 0);
 
         const revenue = payments
           .filter((p) => p.status === "paid")
@@ -105,11 +112,11 @@ export default function Dashboard() {
         });
 
         const statusLabels = [
-          { key: "paid", label: "Payes" },
+          { key: "paid", label: "Payés" },
           { key: "pending", label: "En attente" },
           { key: "partial", label: "Partiels" },
           { key: "overdue", label: "En retard" },
-          { key: "cancelled", label: "Annules" },
+          { key: "cancelled", label: "Annulés" },
         ];
         const breakdown = statusLabels.map((s) => ({
           ...s,
@@ -135,11 +142,11 @@ export default function Dashboard() {
         }));
 
         const maintenanceLabels = [
-          { key: "reported", label: "Signale" },
+          { key: "reported", label: "Signalé" },
           { key: "pending", label: "En attente" },
           { key: "in_progress", label: "En cours" },
-          { key: "completed", label: "Termine" },
-          { key: "cancelled", label: "Annule" },
+          { key: "completed", label: "Terminé" },
+          { key: "cancelled", label: "Annulé" },
         ];
         const maintenanceData = maintenanceLabels.map((m) => ({
           ...m,
@@ -195,28 +202,39 @@ export default function Dashboard() {
     fetchStats();
   }, []);
 
-  const StatCard = ({ title, value, icon: Icon, link, gradient, delay }) => (
+  const StatCard = ({ title, value, icon: Icon, link, gradient, subValue, delay }) => (
     <div
       onClick={() => navigate(link)}
-      className="relative overflow-hidden transition-all duration-500 bg-white border border-gray-100 shadow-sm cursor-pointer group rounded-2xl hover:shadow-xl"
+      className="relative overflow-hidden transition-all duration-500 bg-white border border-gray-100 shadow-sm cursor-pointer group rounded-3xl hover:shadow-xl hover:-translate-y-1"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500`} />
 
-      <div className="relative p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10`}>
-            <Icon className="w-6 h-6 text-gray-700" strokeWidth={1.5} />
+      <div className="relative p-7">
+        <div className="flex items-start justify-between mb-5">
+          <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} bg-opacity-10 shadow-inner`}>
+            <Icon className="w-7 h-7 text-gray-800" strokeWidth={1.5} />
           </div>
-          <ArrowUpRight className="w-5 h-5 text-gray-400 transition-opacity opacity-0 group-hover:opacity-100" />
+          <div className="flex items-center justify-center w-8 h-8 transition-transform group-hover:rotate-45">
+            <ArrowUpRight className="w-6 h-6 text-gray-300" />
+          </div>
         </div>
 
         <div className="space-y-1">
-          <p className="text-sm font-medium tracking-wide text-gray-500 uppercase">{title}</p>
-          <h3 className="text-3xl font-bold tracking-tight text-gray-900">{value}</h3>
+          <p className="text-xs font-bold tracking-[0.1em] text-gray-400 uppercase">{title}</p>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-3xl font-black tracking-tight text-gray-900 font-display">{value}</h3>
+            {subValue && (
+              <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                {subValue}
+              </span>
+            )}
+          </div>
         </div>
+      </div>
 
-        <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-500" />
+      <div className="absolute bottom-0 left-0 w-full h-1.5 transition-all duration-700 bg-gray-50 overflow-hidden">
+        <div className={`h-full w-0 group-hover:w-full transition-all duration-1000 ease-out bg-gradient-to-r ${gradient}`} />
       </div>
     </div>
   );
@@ -224,46 +242,67 @@ export default function Dashboard() {
   const QuickAction = ({ title, icon: Icon, onClick, color }) => (
     <button
       onClick={onClick}
-      className={`group relative overflow-hidden px-6 py-3.5 rounded-xl font-medium text-white bg-gradient-to-r ${color} hover:shadow-lg transition-all duration-300 flex items-center gap-2.5`}
+      className={`group relative overflow-hidden px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r ${color} hover:shadow-2xl hover:shadow-indigo-200 transition-all duration-500 flex items-center gap-3 active:scale-95`}
     >
-      <Icon size={18} strokeWidth={2} />
+      <Icon size={20} strokeWidth={2.5} />
       <span>{title}</span>
-      <div className="absolute inset-0 transition-opacity bg-white opacity-0 group-hover:opacity-10" />
+      <div className="absolute inset-0 transition-opacity bg-white opacity-0 group-hover:opacity-15" />
     </button>
   );
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="mb-2 text-4xl font-bold tracking-tight text-gray-900">
-            {role === "admin" ? "Tableau de bord Admin" : "Tableau de bord Bailleur"}
+    <div className="space-y-10 animate-fadeIn p-2 md:p-4">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-1 rounded-full bg-emerald-500" />
+            <span className="text-xs font-black tracking-widest text-emerald-600 uppercase">Aujourd'hui</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-gray-900 md:text-5xl font-display">
+            {role === "admin" ? "Console Admin" : "Espace Bailleur"}
           </h1>
-          <p className="flex items-center gap-2 text-gray-500">
-            <Activity className="w-4 h-4" />
+          <p className="flex items-center gap-2 font-medium text-gray-400">
+            <Activity className="w-4 h-4 text-emerald-500" />
             <span>
               {role === "admin"
                 ? "Vue globale de toute la plateforme"
-                : "Suivi de vos biens et revenus"}
+                : "Suivi en temps réel de votre patrimoine immobilier"}
             </span>
           </p>
         </div>
+
+        {role !== "admin" && (
+          <div className="flex gap-4 p-2 transition-all bg-white border border-gray-100 shadow-sm rounded-3xl">
+            <div className="px-6 py-3 border-r border-gray-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Taux d'occupation</p>
+              <p className="text-xl font-black text-gray-900">{occupancyRate.toFixed(1)}%</p>
+            </div>
+            <div className="px-6 py-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Status Global</p>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <p className="text-sm font-bold text-emerald-600 uppercase tracking-tighter text-nowrap">Opérationnel</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-40 bg-gray-100 rounded-2xl animate-pulse" />
+            <div key={i} className="h-44 bg-gray-100 rounded-3xl animate-pulse" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Proprits"
+            title="Propriétés"
             value={stats.properties}
             icon={Home}
             link="/properties"
-            gradient="from-blue-500 to-cyan-500"
+            gradient="from-indigo-600 to-blue-500"
+            subValue={`${occupancyRate.toFixed(0)}% Occupé`}
             delay={0}
           />
           <StatCard
@@ -271,7 +310,8 @@ export default function Dashboard() {
             value={stats.tenants}
             icon={Users}
             link="/tenants"
-            gradient="from-purple-500 to-pink-500"
+            gradient="from-violet-600 to-fuchsia-500"
+            subValue="Actifs"
             delay={100}
           />
           <StatCard
@@ -279,15 +319,17 @@ export default function Dashboard() {
             value={stats.payments}
             icon={CreditCard}
             link="/payments"
-            gradient="from-green-500 to-emerald-500"
+            gradient="from-emerald-600 to-teal-500"
+            subValue="Ce mois"
             delay={200}
           />
           <StatCard
-            title="Revenus"
+            title="Revenus Mensuels"
             value={`${stats.revenue.toLocaleString()} FCFA`}
             icon={TrendingUp}
             link="/payments"
-            gradient="from-orange-500 to-red-500"
+            gradient="from-orange-600 to-amber-500"
+            subValue="+12% vs last month"
             delay={300}
           />
         </div>

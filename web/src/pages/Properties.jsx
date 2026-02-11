@@ -358,50 +358,55 @@ export default function Properties() {
   };
 
   const PropertyCard = ({ property }) => (
-    <div className="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-md group rounded-3xl hover:shadow-xl">
+    <div className="overflow-hidden transition-all duration-500 bg-white border border-slate-100 shadow-sm group rounded-[2.5rem] hover:shadow-2xl hover:shadow-slate-200 hover:-translate-y-2">
       {/* Image principale */}
       {property.photos && property.photos.length > 0 ? (
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative h-56 overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors z-10" />
           <img
             src={property.photos[0]}
             alt={property.title}
-            className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+            className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
           />
           {property.photos.length > 1 && (
-            <div className="absolute flex items-center gap-1 px-2 py-1 text-xs text-white bg-black rounded-lg bottom-2 right-2 bg-opacity-70">
-              <ImageIcon className="w-3 h-3" />
-              {property.photos.length}
+            <div className="absolute flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest text-white bg-slate-900 rounded-full bottom-4 right-4 z-20 shadow-lg">
+              <ImageIcon className="w-3.5 h-3.5" />
+              {property.photos.length} PHOTOS
             </div>
           )}
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-4 right-4 z-20">
             {getStatusBadge(property.status)}
           </div>
         </div>
       ) : (
-        <div className="relative flex items-center justify-center h-48 bg-gradient-to-br from-gray-100 to-gray-200">
-          <ImageIcon className="w-16 h-16 text-gray-400" />
-          <div className="absolute top-2 right-2">
+        <div className="relative flex items-center justify-center h-56 bg-slate-50">
+          <ImageIcon className="w-16 h-16 text-slate-200" />
+          <div className="absolute top-4 right-4 z-20">
             {getStatusBadge(property.status)}
           </div>
         </div>
       )}
 
-      <div className="p-6">
+      <div className="p-8">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-xl flex items-center justify-center">
-              <Home className="w-6 h-6 text-white" strokeWidth={2} />
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className={`w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center shadow-lg`}>
+              <Home className="w-7 h-7 text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#1C9B7E] transition-colors">
+              <h3 className="text-xl font-black tracking-tighter text-slate-900 group-hover:text-emerald-600 transition-colors">
                 {property.title}
               </h3>
-              <p className="text-sm text-gray-500">{getTypeLabel(property.type)}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{getTypeLabel(property.type)}</p>
+                {property.energy_rating && <div className="w-1 h-1 rounded-full bg-slate-300" />}
+                {getEnergyRatingBadge(property.energy_rating)}
+              </div>
               {userRole === "admin" && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-slate-500">
                   Bailleur:{" "}
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-bold text-slate-700">
                     {ownerMap[property.owner_id] || "Bailleur inconnu"}
                   </span>
                 </p>
@@ -412,7 +417,7 @@ export default function Properties() {
             <button
               type="button"
               onClick={() => handleEdit(property)}
-              className="p-2 text-gray-500 transition-colors rounded-xl hover:text-[#1C9B7E] hover:bg-[#1C9B7E] hover:bg-opacity-10"
+              className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-emerald-600 hover:bg-emerald-50"
               aria-label="Modifier"
             >
               <Edit2 className="w-4 h-4" />
@@ -420,7 +425,7 @@ export default function Properties() {
             <button
               type="button"
               onClick={() => handleDelete(property.id)}
-              className="p-2 text-gray-500 transition-colors rounded-xl hover:text-red-600 hover:bg-red-50"
+              className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-red-600 hover:bg-red-50"
               aria-label="Supprimer"
             >
               <Trash2 className="w-4 h-4" />
@@ -429,12 +434,12 @@ export default function Properties() {
         </div>
 
         {/* Address */}
-        <div className="flex items-start gap-2 mb-4 text-sm text-gray-600">
-          <MapPin className="w-4 h-4 text-[#1C9B7E] flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 mb-6 p-4 bg-slate-50 rounded-2xl group-hover:bg-emerald-50 transition-colors">
+          <MapPin className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="line-clamp-1">{property.address}</p>
+            <p className="font-bold text-slate-700 line-clamp-1">{property.address}</p>
             {property.city && (
-              <p className="text-xs text-gray-500">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                 {property.city} {property.postal_code}
               </p>
             )}
@@ -442,103 +447,35 @@ export default function Properties() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {property.bedrooms !== null && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Bed className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">Chambres</span>
-              </div>
-              <p className="font-bold text-gray-900">{property.bedrooms}</p>
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {[
+            { icon: Bed, label: 'Beds', val: property.bedrooms },
+            { icon: Bath, label: 'Baths', val: property.bathrooms },
+            { icon: Square, label: 'm²', val: property.surface ?? property.surface_area }
+          ].map((feat, i) => (
+            <div key={i} className="flex flex-col items-center p-3 border border-slate-100 rounded-2xl">
+              <feat.icon className="w-4 h-4 text-slate-400 mb-1.5" />
+              <span className="text-sm font-black text-slate-900">{feat.val ?? '-'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{feat.label}</span>
             </div>
-          )}
-
-          {property.bathrooms !== null && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Bath className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">Bains</span>
-              </div>
-              <p className="font-bold text-gray-900">{property.bathrooms}</p>
-            </div>
-          )}
-
-          {(property.surface ?? property.surface_area) && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Square className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">m</span>
-              </div>
-              <p className="font-bold text-gray-900">{property.surface ?? property.surface_area}</p>
-            </div>
-          )}
-
-          {property.rooms && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Home className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">Pices</span>
-              </div>
-              <p className="font-bold text-gray-900">{property.rooms}</p>
-            </div>
-          )}
-
-          {property.floor !== null && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Layers className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">tage</span>
-              </div>
-              <p className="font-bold text-gray-900">
-                {property.floor}
-                {property.has_elevator && " 🛗"}
-              </p>
-            </div>
-          )}
-
-          {property.year_built && (
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar className="w-4 h-4 text-[#1C9B7E]" />
-                <span className="text-xs text-gray-500">Anne</span>
-              </div>
-              <p className="font-bold text-gray-900">{property.year_built}</p>
-            </div>
-          )}
+          ))}
         </div>
 
-        {/* Energy Rating */}
-        {property.energy_rating && (
-          <div className="mb-4">
-            {getEnergyRatingBadge(property.energy_rating)}
-          </div>
-        )}
-
-        {/* Description */}
-        {property.description && (
-          <p className="mb-4 text-sm text-gray-600 line-clamp-2">
-            {property.description}
-          </p>
-        )}
-
         {/* Price */}
-        <div className="pt-4 border-t border-gray-100">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Prix</span>
-            <div className="flex items-center gap-1">
-              <DollarSign className="w-5 h-5 text-[#1C9B7E]" />
-              <span className="text-xl font-bold text-[#1C9B7E]">
+        <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Loyer Mensuel</p>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-slate-900 tracking-tighter">
                 {property.price?.toLocaleString()}
               </span>
-              <span className="text-sm text-gray-500">FCFA</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">FCFA</span>
             </div>
           </div>
           {property.charges > 0 && (
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-gray-500">Charges</span>
-              <span className="text-sm font-semibold text-gray-700">
-                +{property.charges?.toLocaleString()} FCFA
-              </span>
+            <div className="text-right">
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Charges Incluses</p>
+              <p className="text-sm font-bold text-slate-700">+{property.charges?.toLocaleString()} FCFA</p>
             </div>
           )}
         </div>
@@ -547,12 +484,16 @@ export default function Properties() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-fadeIn p-2 md:p-4">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Proprietes</h1>
-          <p className="text-gray-500">Grez votre portefeuille immobilier</p>
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-1 rounded-full bg-emerald-500" />
+            <span className="text-xs font-black tracking-widest text-emerald-600 uppercase">Portfolio</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-slate-900 md:text-5xl font-display">Propriétés</h1>
+          <p className="font-medium text-slate-400">Gérez votre parc immobilier et optimisez vos revenus</p>
         </div>
 
         {!showForm && (
@@ -562,55 +503,53 @@ export default function Properties() {
               setEditingPropertyId(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-[#1C9B7E] to-[#17866C] text-white rounded-2xl hover:shadow-lg transition-all duration-300 font-medium"
+            className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-2xl hover:shadow-2xl hover:shadow-slate-200 transition-all duration-500 font-bold active:scale-95 group"
           >
-            <Plus size={20} strokeWidth={2} />
-            <span>Nouvelle propriete</span>
+            <Plus size={22} strokeWidth={3} className="transition-transform group-hover:rotate-90" />
+            <span>NOUVELLE PROPRIÉTÉ</span>
           </button>
         )}
       </div>
 
       {/* Stats & Filters */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="p-6 bg-white border border-gray-100 shadow-md rounded-3xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="mb-1 text-sm text-gray-500">Total des proprietes</p>
-              <p className="text-3xl font-bold text-gray-900">{properties.length}</p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-[#1C9B7E] to-[#17866C] rounded-2xl">
-              <Home className="w-8 h-8 text-white" strokeWidth={1.5} />
-            </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="p-8 bg-white border border-slate-100 shadow-sm rounded-[2.5rem] flex items-center justify-between group hover:shadow-xl transition-all">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Total Biens</p>
+            <p className="text-4xl font-black text-slate-900 font-display tracking-tight">{properties.length}</p>
+          </div>
+          <div className="p-5 bg-slate-50 rounded-2xl group-hover:bg-emerald-50 transition-colors">
+            <Home className="w-8 h-8 text-slate-400 group-hover:text-emerald-500" strokeWidth={1.5} />
           </div>
         </div>
 
-        <div className="p-4 bg-white border border-gray-100 shadow-md rounded-3xl">
-          <div className="relative">
-            <Search className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+        <div className="p-4 bg-white border border-slate-100 shadow-sm rounded-[2.5rem] flex items-center">
+          <div className="relative w-full">
+            <Search className="absolute w-5 h-5 text-slate-400 -translate-y-1/2 left-6 top-1/2" />
             <input
               type="text"
-              placeholder="Rechercher une propriete..."
+              placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] transition-all outline-none"
+              className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-3xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900 placeholder:text-slate-400"
             />
           </div>
         </div>
 
-        <div className="p-4 bg-white border border-gray-100 shadow-md rounded-3xl">
-          <div className="relative">
-            <Filter className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-4 top-1/2" />
+        <div className="p-4 bg-white border border-slate-100 shadow-sm rounded-[2.5rem] flex items-center">
+          <div className="relative w-full">
+            <Filter className="absolute w-5 h-5 text-slate-400 -translate-y-1/2 left-6 top-1/2 pointer-events-none" />
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] transition-all outline-none appearance-none"
+              className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-3xl focus:ring-2 focus:ring-slate-900 transition-all outline-none appearance-none font-bold text-slate-900"
             >
-              <option value="all">Tous les types</option>
-              <option value="apartment">Appartement</option>
-              <option value="house">Maison</option>
-              <option value="studio">Studio</option>
-              <option value="duplex">Duplex</option>
-              <option value="loft">Loft</option>
+              <option value="all">TOUS LES TYPES</option>
+              <option value="apartment">APPARTEMENT</option>
+              <option value="house">MAISON</option>
+              <option value="studio">STUDIO</option>
+              <option value="duplex">DUPLEX</option>
+              <option value="loft">LOFT</option>
             </select>
           </div>
         </div>
@@ -618,398 +557,144 @@ export default function Properties() {
 
       {/* Add Property Form */}
       {showForm && (
-        <div ref={formRef} className="p-6 bg-white border border-gray-200 shadow-lg rounded-3xl">
-          <h3 className="mb-6 text-xl font-bold text-gray-900">
-            {editingPropertyId ? "Modifier la propriete" : "Nouvelle propriete"}
-          </h3>
+        <div ref={formRef} className="p-8 bg-white border border-slate-200 shadow-2xl rounded-[2.5rem] animate-fadeIn">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">
+              {editingPropertyId ? "Modifier le bien" : "Nouveau bien immobilier"}
+            </h3>
+            <button
+              onClick={() => { setShowForm(false); resetForm(); }}
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
 
-          <form onSubmit={handleSave}>
-            <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2">
-              {/* Titre */}
+          <form onSubmit={handleSave} className="space-y-8">
+            <div className="grid grid-cols-1 gap-6 mb-6 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Titre *</label>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Titre de l'annonce *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Villa moderne 3 chambres"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
+                  placeholder="Villa moderne avec piscine..."
+                  className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900"
                   value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 />
               </div>
 
-              {/* Upload d'images */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Photos de la propriete</label>
-                
-                {/* Zone d'upload */}
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-[#1C9B7E] transition-colors">
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Photos du bien</label>
+                <div className="border-4 border-dashed border-slate-100 rounded-[2.5rem] p-10 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group flex flex-col items-center justify-center cursor-pointer relative">
                   <input
                     type="file"
                     multiple
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="hidden"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
                     id="image-upload"
                     disabled={uploadingImages}
                   />
-                  <label
-                    htmlFor="image-upload"
-                    className="flex flex-col items-center cursor-pointer"
-                  >
-                    <Upload className="w-12 h-12 mb-3 text-gray-400" />
-                    <p className="mb-1 text-sm font-medium text-gray-700">
-                      {uploadingImages ? "Upload en cours..." : "Cliquez pour ajouter des photos"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      PNG, JPG, WEBP jusqu' 10MB
-                    </p>
-                  </label>
+                  <div className="p-5 bg-white rounded-3xl shadow-xl mb-4 group-hover:scale-110 transition-transform">
+                    <Upload className="w-8 h-8 text-slate-900" />
+                  </div>
+                  <p className="text-sm font-black text-slate-900">
+                    {uploadingImages ? "UPLOAD EN COURS..." : "CLIQUEZ OU GLISSEZ VOS PHOTOS ICI"}
+                  </p>
+                  <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                    Format JPG, PNG ou WEBP (Max 10MB)
+                  </p>
                 </div>
-
-                {/* Prvisualisation des images */}
                 {photoPreviews.length > 0 && (
-                  <div className="grid grid-cols-2 gap-4 mt-4 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 mt-6 md:grid-cols-4 lg:grid-cols-6">
                     {photoPreviews.map((photo, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={photo}
-                          alt={`Photo ${index + 1}`}
-                          className="object-cover w-full h-32 border border-gray-200 rounded-xl"
-                        />
+                      <div key={index} className="relative aspect-square group overflow-hidden rounded-2xl border-4 border-white shadow-md">
+                        <img src={photo} className="object-cover w-full h-full" alt="Preview" />
                         <button
                           type="button"
                           onClick={() => removeImage(index)}
-                          className="absolute p-1 text-white transition-opacity bg-red-500 rounded-full opacity-0 top-2 right-2 group-hover:opacity-100 hover:bg-red-600"
+                          className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <X className="w-4 h-4" />
+                          <X size={14} strokeWidth={3} />
                         </button>
-                        {index === 0 && (
-                          <div className="absolute bottom-2 left-2 px-2 py-1 bg-[#1C9B7E] text-white text-xs rounded-lg">
-                            Principal
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Adresse */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Adresse *</label>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Adresse complète *</label>
                 <input
                   type="text"
                   required
-                  placeholder="123 Rue du Commerce"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
+                  className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900"
                   value={formData.address}
-                  onChange={(e) =>
-                    setFormData({ ...formData, address: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 />
               </div>
 
-              {/* Ville */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ville</label>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Ville</label>
                 <input
                   type="text"
-                  placeholder="Ouagadougou"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
+                  className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900"
                   value={formData.city}
-                  onChange={(e) =>
-                    setFormData({ ...formData, city: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 />
               </div>
 
-              {/* Code postal */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Code postal</label>
-                <input
-                  type="text"
-                  placeholder="01 BP 1234"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.postal_code}
-                  onChange={(e) =>
-                    setFormData({ ...formData, postal_code: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Pays */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Pays</label>
-                <input
-                  type="text"
-                  placeholder="Burkina Faso"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.country}
-                  onChange={(e) =>
-                    setFormData({ ...formData, country: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Latitude */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Latitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="12.3714"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.latitude}
-                  onChange={(e) =>
-                    setFormData({ ...formData, latitude: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Longitude */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Longitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="-1.5197"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.longitude}
-                  onChange={(e) =>
-                    setFormData({ ...formData, longitude: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Surface */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Surface (m)</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="120"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.surface}
-                  onChange={(e) =>
-                    setFormData({ ...formData, surface: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Pices */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Nombre de pices</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="5"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.rooms}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rooms: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Chambres */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Chambres</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="3"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.bedrooms}
-                  onChange={(e) =>
-                    setFormData({ ...formData, bedrooms: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Salles de bain */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Salles de bain</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="2"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.bathrooms}
-                  onChange={(e) =>
-                    setFormData({ ...formData, bathrooms: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* tage */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">tage</label>
-                <input
-                  type="number"
-                  placeholder="3"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.floor}
-                  onChange={(e) =>
-                    setFormData({ ...formData, floor: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Anne de construction */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Anne de construction</label>
-                <input
-                  type="number"
-                  min="1800"
-                  max="2100"
-                  placeholder="2020"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.year_built}
-                  onChange={(e) =>
-                    setFormData({ ...formData, year_built: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Type */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Type</label>
-                <select
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value })
-                  }
-                >
-                  <option value="apartment">Appartement</option>
-                  <option value="house">Maison</option>
-                  <option value="studio">Studio</option>
-                  <option value="duplex">Duplex</option>
-                  <option value="loft">Loft</option>
-                </select>
-              </div>
-
-              {/* Statut */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Statut</label>
-                <select
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value })
-                  }
-                >
-                  <option value="available">Disponible</option>
-                  <option value="rented">Lou</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="sold">Vendu</option>
-                </select>
-              </div>
-
-              {/* Classe nergtique */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Classe nergtique (DPE)</label>
-                <select
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.energy_rating}
-                  onChange={(e) =>
-                    setFormData({ ...formData, energy_rating: e.target.value })
-                  }
-                >
-                  <option value="">Non renseign</option>
-                  <option value="A">A (Excellent)</option>
-                  <option value="B">B (Trs bon)</option>
-                  <option value="C">C (Bon)</option>
-                  <option value="D">D (Moyen)</option>
-                  <option value="E">E (Passable)</option>
-                  <option value="F">F (Faible)</option>
-                  <option value="G">G (Trs faible)</option>
-                </select>
-              </div>
-
-              {/* Prix */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Prix (FCFA) *</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="1000"
-                  placeholder="150000"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Charges */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Charges (FCFA)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  placeholder="0"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none"
-                  value={formData.charges}
-                  onChange={(e) =>
-                    setFormData({ ...formData, charges: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Ascenseur */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="flex items-center gap-3 cursor-pointer">
+              <div className="grid grid-cols-2 gap-4 md:col-span-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Loyer Mensuel (FCFA)</label>
                   <input
-                    type="checkbox"
-                    checked={formData.has_elevator}
-                    onChange={(e) =>
-                      setFormData({ ...formData, has_elevator: e.target.checked })
-                    }
-                    className="w-5 h-5 text-[#1C9B7E] border-gray-300 rounded focus:ring-[#1C9B7E]"
+                    type="number"
+                    className="w-full px-6 py-4 bg-emerald-50 border-0 rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all outline-none font-black text-emerald-900 text-xl"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   />
-                  <span className="text-sm font-medium text-gray-700">Ascenseur disponible</span>
-                </label>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Type de bien</label>
+                  <select
+                    className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900 appearance-none"
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  >
+                    <option value="apartment">APPARTEMENT</option>
+                    <option value="house">MAISON</option>
+                    <option value="studio">STUDIO</option>
+                    <option value="duplex">DUPLEX</option>
+                    <option value="loft">LOFT</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Description */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Description</label>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Description détaillée</label>
                 <textarea
                   rows="4"
-                  placeholder="Description dtaille de la propriete..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1C9B7E] focus:border-transparent transition-all outline-none resize-none"
+                  className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900 resize-none"
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingPropertyId(null);
-                  resetForm();
-                }}
-                className="px-6 py-3 font-medium text-gray-700 transition-colors border border-gray-200 rounded-xl hover:bg-gray-50"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="px-8 py-4 font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors"
               >
                 Annuler
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-[#1C9B7E] to-[#17866C] text-white rounded-xl hover:shadow-lg transition-all font-medium"
+                className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl hover:shadow-slate-200 transition-all active:scale-95"
               >
-                {editingPropertyId ? "Mettre a jour" : "Enregistrer"}
+                {editingPropertyId ? "Mettre à jour" : "Confirmer le bien"}
               </button>
             </div>
           </form>
@@ -1018,21 +703,21 @@ export default function Properties() {
 
       {/* Properties Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-gray-100 h-80 rounded-3xl animate-pulse" />
+            <div key={i} className="bg-white h-[32rem] rounded-[2.5rem] border border-slate-100 animate-pulse" />
           ))}
         </div>
       ) : filteredProperties.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-gray-100 shadow-md rounded-3xl">
-          <Home className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="mb-2 text-xl font-semibold text-gray-900">Aucune propriete trouvee</h3>
-          <p className="text-gray-500">
-            {searchTerm ? "Essayez d'ajuster votre recherche" : "Commencez par ajouter votre premiere propriete"}
-          </p>
+        <div className="p-20 text-center bg-white border border-slate-100 shadow-sm rounded-[2.5rem]">
+          <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Home className="w-10 h-10 text-slate-200" />
+          </div>
+          <h3 className="text-2xl font-black text-slate-900 tracking-tighter uppercase mb-2">Aucun bien trouvé</h3>
+          <p className="text-slate-400 font-medium">Ajustez vos filtres ou commencez à bâtir votre portfolio.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
           {filteredProperties.map((property) => (
             <PropertyCard key={property.id} property={property} />
           ))}
@@ -1041,16 +726,4 @@ export default function Properties() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -5,7 +5,7 @@ import '../core/models.dart';
 import '../core/providers/dashboard_providers.dart';
 import '../core/constants.dart';
 
-/// Profile screen showing tenant information and logout option
+/// Écran de profil premium pour les locataires
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -15,85 +15,184 @@ class ProfileScreen extends ConsumerWidget {
     final authService = AuthService();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon Profil')),
+      backgroundColor: const Color(AppColors.background),
       body: dashboardAsync.when(
         data: (data) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardDataProvider);
           },
-          child: ListView(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.all(AppConstants.defaultPadding),
-            children: [
-              // Profile header
-              _buildProfileHeader(context, data.tenant),
-              const SizedBox(height: 30),
-
-              // Contact information
-              _buildContactInfo(data.tenant),
-              const SizedBox(height: 30),
-
-              // App information
-              _buildAppInfo(),
-              const SizedBox(height: 30),
-
-              // Logout button
-              _buildLogoutButton(context, authService),
-            ],
-          ),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 60, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Erreur: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(dashboardDataProvider),
-                child: const Text('Réessayer'),
+            slivers: [
+              _buildHeader(context, data.tenant),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.defaultPadding,
+                  vertical: AppConstants.largePadding,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildSectionTitle('Informations Personnelles'),
+                    _buildProfileItem(
+                      icon: Icons.person_outline_rounded,
+                      title: 'Nom complet',
+                      value: data.tenant.name.isNotEmpty
+                          ? data.tenant.name
+                          : 'Utilisateur',
+                    ),
+                    _buildProfileItem(
+                      icon: Icons.email_outlined,
+                      title: 'Email',
+                      value: data.tenant.email.isNotEmpty
+                          ? data.tenant.email
+                          : 'Non disponible',
+                    ),
+                    _buildProfileItem(
+                      icon: Icons.phone_outlined,
+                      title: 'Téléphone',
+                      value: data.tenant.phone.isNotEmpty
+                          ? data.tenant.phone
+                          : 'Non renseigné',
+                    ),
+                    const SizedBox(height: 32),
+                    if (data.property.id.isNotEmpty) ...[
+                      _buildSectionTitle('Ma Propriété'),
+                      _buildProfileItem(
+                        icon: Icons.home_outlined,
+                        title: 'Adresse',
+                        value: data.property.address,
+                      ),
+                      _buildProfileItem(
+                        icon: Icons.location_city_outlined,
+                        title: 'Ville',
+                        value:
+                            '${data.property.city} ${data.property.postalCode}'
+                                .trim(),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                    _buildSectionTitle('Application'),
+                    _buildProfileItem(
+                      icon: Icons.info_outline_rounded,
+                      title: 'Version',
+                      value: '1.0.5 Stable',
+                    ),
+                    _buildProfileItem(
+                      icon: Icons.support_agent_rounded,
+                      title: 'Support technique',
+                      value: 'support@propriflow.com',
+                    ),
+                    const SizedBox(height: 48),
+                    _buildLogoutButton(context, authService),
+                    const SizedBox(
+                      height: 80,
+                    ), // Espace sous le bouton de déconnexion
+                  ]),
+                ),
               ),
             ],
           ),
         ),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(AppColors.accent)),
+        ),
+        error: (error, stack) => _buildErrorState(ref, error),
       ),
     );
   }
 
-  /// Build profile header with avatar and name
-  Widget _buildProfileHeader(BuildContext context, Tenant tenant) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(AppConstants.largePadding),
-        child: Column(
+  /// Header avec dégradé et avatar
+  Widget _buildHeader(BuildContext context, Tenant tenant) {
+    return SliverAppBar(
+      expandedHeight: 240,
+      pinned: true,
+      stretch: true,
+      elevation: 0,
+      backgroundColor: const Color(AppColors.accent),
+      flexibleSpace: FlexibleSpaceBar(
+        stretchModes: const [
+          StretchMode.zoomBackground,
+          StretchMode.blurBackground,
+        ],
+        background: Stack(
+          fit: StackFit.expand,
           children: [
-            GestureDetector(
-              onLongPress: () =>
-                  Navigator.pushNamed(context, '/debug-settings'),
-              child: const CircleAvatar(
-                radius: 50,
-                backgroundColor: Color(AppColors.surface),
-                child: Icon(
-                  Icons.person,
-                  size: 50,
-                  color: Color(AppColors.accent),
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(AppColors.accent),
+                    Color(AppColors.accentSoft),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              tenant.name.isNotEmpty ? tenant.name : 'Utilisateur',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Locataire',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(AppColors.textSecondary),
+            // Décoration subtile (cercles)
+            Positioned(
+              top: -50,
+              right: -50,
+              child: CircleAvatar(
+                radius: 100,
+                backgroundColor: Colors.white.withOpacity(0.05),
               ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                GestureDetector(
+                  onLongPress: () =>
+                      Navigator.pushNamed(context, '/debug-settings'),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(AppColors.background),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        size: 60,
+                        color: Color(AppColors.accent),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  tenant.name.isNotEmpty ? tenant.name : 'Utilisateur',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'LOCATAIRE PREMIUM',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -101,106 +200,179 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// Build contact information section
-  Widget _buildContactInfo(Tenant tenant) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Informations de contact',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-
-            // Email
-            ListTile(
-              leading: const Icon(Icons.email, color: Color(AppColors.accent)),
-              title: const Text('Email'),
-              subtitle: Text(
-                tenant.email.isNotEmpty ? tenant.email : 'Non disponible',
-              ),
-            ),
-
-            // Phone
-            ListTile(
-              leading: const Icon(
-                Icons.phone,
-                color: Color(AppColors.accentSoft),
-              ),
-              title: const Text('Téléphone'),
-              subtitle: Text(
-                tenant.phone.isNotEmpty ? tenant.phone : 'Non disponible',
-              ),
-            ),
-          ],
+  /// Titre de section stylisé
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 16),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: Color(AppColors.textSecondary),
+          letterSpacing: 1.5,
         ),
       ),
     );
   }
 
-  /// Build application information section
-  Widget _buildAppInfo() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'À propos de l\'application',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+  /// Élément de profil individuel (style premium)
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(AppColors.accent).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(15),
             ),
-            const SizedBox(height: 16),
-
-            const ListTile(
-              leading: Icon(Icons.info, color: Color(AppColors.accent)),
-              title: Text('Version'),
-              subtitle: Text('1.0.0'),
+            child: Icon(icon, color: const Color(AppColors.accent), size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(AppColors.textSecondary),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(AppColors.textPrimary),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
             ),
-
-            const ListTile(
-              leading: Icon(Icons.security, color: Color(AppColors.accentSoft)),
-              title: Text('Sécurité'),
-              subtitle: Text('Connexion sécurisée par JWT'),
-            ),
-
-            const ListTile(
-              leading: Icon(Icons.support, color: Color(AppColors.accent)),
-              title: Text('Support'),
-              subtitle: Text('contact@rental-management.com'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  /// Build logout button
+  /// Bouton de déconnexion stylisé
   Widget _buildLogoutButton(BuildContext context, AuthService authService) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: () => _handleLogout(context, authService),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.red,
-          side: const BorderSide(color: Colors.red),
+    return ElevatedButton(
+      onPressed: () => _handleLogout(context, authService),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.red,
+        elevation: 0,
+        minimumSize: const Size(double.infinity, 64),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.red.withOpacity(0.1), width: 1.5),
         ),
-        child: const Row(
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.logout_rounded, size: 24),
+          SizedBox(width: 12),
+          Text(
+            'Se déconnecter',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// État d'erreur stylisé
+  Widget _buildErrorState(WidgetRef ref, Object error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.logout, size: 20),
-            SizedBox(width: 8),
-            Text('Se déconnecter', style: TextStyle(fontSize: 16)),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                size: 60,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Oups !',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Un problème est survenu lors de la récupération de votre profil.\n$error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(AppColors.textSecondary),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(dashboardDataProvider),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(AppColors.accent),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              child: const Text(
+                'Réessayer',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// Handle logout
+  /// Gestion de la déconnexion avec confirmation
   Future<void> _handleLogout(
     BuildContext context,
     AuthService authService,
@@ -208,17 +380,41 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        title: const Text(
+          'Déconnexion',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'Êtes-vous sûr de vouloir quitter votre session ?',
+          style: TextStyle(color: Color(AppColors.textSecondary)),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        actionsPadding: const EdgeInsets.all(16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(AppColors.textSecondary),
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Déconnexion'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            child: const Text(
+              'Déconnexion',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -227,7 +423,6 @@ class ProfileScreen extends ConsumerWidget {
     if (confirmed == true) {
       await authService.logout();
       if (!context.mounted) return;
-      // Navigate to login screen and remove all previous routes
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
   }

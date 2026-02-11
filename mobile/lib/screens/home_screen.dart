@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
 import '../core/providers/dashboard_providers.dart';
+import '../core/providers/payment_providers.dart';
+import '../widgets/stat_charts.dart';
 
 /// Home/Dashboard screen showing tenant overview
 class HomeScreen extends ConsumerWidget {
@@ -11,6 +13,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
+    final paymentsAsync = ref.watch(paymentsProvider);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -18,6 +21,7 @@ class HomeScreen extends ConsumerWidget {
         data: (dashboardData) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardDataProvider);
+            ref.invalidate(paymentsProvider);
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -29,7 +33,24 @@ class HomeScreen extends ConsumerWidget {
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 12),
                     _buildPropertyCard(context, dashboardData.property),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+
+                    // Graphique des paiements
+                    paymentsAsync.when(
+                      data: (payments) => Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(AppConstants.defaultPadding),
+                          child: PaymentHistoryChart(payments: payments),
+                        ),
+                      ),
+                      loading: () => const SizedBox(
+                        height: 200,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (err, stack) => const SizedBox.shrink(),
+                    ),
+
+                    const SizedBox(height: 24),
                     _buildQuickActions(
                       context,
                       unpaidPayments: dashboardData.upcomingPayments

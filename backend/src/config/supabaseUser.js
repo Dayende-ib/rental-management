@@ -9,15 +9,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
   process.exit(1);
 }
 
-const createUserClient = (token) =>
-  createClient(supabaseUrl, supabaseAnonKey, {
+const createUserClient = (token) => {
+  const headers = {
+    apikey: supabaseAnonKey,
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
     global: {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
     },
   });
+};
 
 module.exports = createUserClient;

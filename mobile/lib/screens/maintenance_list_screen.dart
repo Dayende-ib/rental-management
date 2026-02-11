@@ -36,7 +36,7 @@ class MaintenanceListScreen extends ConsumerWidget {
                   padding: EdgeInsets.all(AppConstants.defaultPadding),
                   itemCount: requests.length,
                   itemBuilder: (context, index) {
-                    return _buildMaintenanceCard(requests[index]);
+                    return _buildMaintenanceCard(context, requests[index]);
                   },
                 ),
         ),
@@ -96,7 +96,10 @@ class MaintenanceListScreen extends ConsumerWidget {
   }
 
   /// Build maintenance request card
-  Widget _buildMaintenanceCard(MaintenanceRequest request) {
+  Widget _buildMaintenanceCard(
+    BuildContext context,
+    MaintenanceRequest request,
+  ) {
     Color getStatusColor() {
       switch (request.status) {
         case 'reported':
@@ -135,72 +138,90 @@ class MaintenanceListScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppConstants.cardRadius),
       ),
       elevation: 2,
-      child: Padding(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  height: 36,
-                  width: 36,
-                  decoration: BoxDecoration(
-                    color: getStatusColor(),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(getStatusIcon(), color: Colors.black54, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        request.description,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        request.statusDisplay,
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text(
-                  'Créé le: ${_formatDateTime(request.createdAt)}',
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-            if (request.updatedAt != null) ...[
-              const SizedBox(height: 6),
+      child: InkWell(
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            '/maintenance-detail',
+            arguments: request,
+          );
+        },
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+        child: Padding(
+          padding: EdgeInsets.all(AppConstants.defaultPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  const Icon(Icons.update, size: 16, color: Colors.grey),
+                  Container(
+                    height: 36,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      color: getStatusColor(),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      getStatusIcon(),
+                      color: Colors.black54,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request.description,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          request.statusDisplay,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    'Mis à jour: ${_formatDateTime(request.updatedAt!)}',
+                    'Créé le: ${_formatDateTime(request.createdAt)}',
                     style: const TextStyle(color: Colors.grey),
                   ),
                 ],
               ),
+              if (request.updatedAt != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.update, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Mis à jour: ${_formatDateTime(request.updatedAt!)}',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -4,48 +4,115 @@ import '../core/models.dart';
 import '../core/providers/payment_providers.dart';
 import '../core/constants.dart';
 
-/// Payments screen showing all rent payments
-class PaymentsScreen extends ConsumerWidget {
+/// Payments screen showing all rent payments with filtering
+class PaymentsScreen extends ConsumerStatefulWidget {
   const PaymentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PaymentsScreen> createState() => _PaymentsScreenState();
+}
+
+class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
+  String _filter = 'all'; // 'all', 'paid', 'pending'
+
+  @override
+  Widget build(BuildContext context) {
     final paymentsAsync = ref.watch(paymentsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mes Paiements')),
+      appBar: AppBar(
+        title: const Text('Mes Paiements'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(50),
+          child: _buildFilterBar(),
+        ),
+      ),
       body: paymentsAsync.when(
-        data: (payments) => RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(paymentsProvider);
-          },
-          child: payments.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(AppConstants.defaultPadding),
-                  itemCount: payments.length,
-                  itemBuilder: (context, index) {
-                    return _buildPaymentCard(context, ref, payments[index]);
-                  },
-                ),
-        ),
+        data: (payments) {
+          final filteredPayments = _applyFilter(payments);
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(paymentsProvider);
+            },
+            child: filteredPayments.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.all(AppConstants.defaultPadding),
+                    itemCount: filteredPayments.length,
+                    itemBuilder: (context, index) {
+                      return _buildPaymentCard(
+                        context,
+                        ref,
+                        filteredPayments[index],
+                      );
+                    },
+                  ),
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 60, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Erreur: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(paymentsProvider),
-                child: const Text('Réessayer'),
-              ),
-            ],
+        error: (error, stack) => _buildErrorState(error),
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          _filterChip('Tous', 'all'),
+          const SizedBox(width: 8),
+          _filterChip('Validés', 'paid'),
+          const SizedBox(width: 8),
+          _filterChip('En attente', 'pending'),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, String value) {
+    final isSelected = _filter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) setState(() => _filter = value);
+      },
+      selectedColor: const Color(AppColors.accent).withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: isSelected ? const Color(AppColors.accent) : Colors.black54,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+  }
+
+  List<Payment> _applyFilter(List<Payment> payments) {
+    if (_filter == 'all') return payments;
+    if (_filter == 'paid') {
+      return payments.where((p) => p.isPaid || p.isValidated).toList();
+    }
+    if (_filter == 'pending') {
+      return payments.where((p) => !p.isPaid && !p.isValidated).toList();
+    }
+    return payments;
+  }
+
+  Widget _buildErrorState(Object error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error, size: 60, color: Colors.red),
+          const SizedBox(height: 16),
+          Text('Erreur: $error'),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => ref.invalidate(paymentsProvider),
+            child: const Text('Réessayer'),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -57,21 +124,17 @@ class PaymentsScreen extends ConsumerWidget {
         children: [
           const Icon(Icons.payment, size: 80, color: Colors.grey),
           const SizedBox(height: 16),
-          const Text(
-            'Aucun paiement trouvé',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Les paiements apparaîtront ici',
-            style: TextStyle(color: Colors.grey),
+          Text(
+            _filter == 'all'
+                ? 'Aucun paiement trouvé'
+                : 'Aucun paiement dans cette catégorie',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  /// Build payment card avec statut de validation
   Widget _buildPaymentCard(
     BuildContext context,
     WidgetRef ref,
@@ -92,23 +155,19 @@ class PaymentsScreen extends ConsumerWidget {
     } else if (isPendingValidation) {
       badgeColor = Colors.orange.shade100;
       badgeTextColor = Colors.orange.shade800;
-      badgeText = 'Validation bailleur';
+      badgeText = 'En attente';
     } else if (isRejected) {
       badgeColor = Colors.red.shade100;
       badgeTextColor = Colors.red.shade800;
-      badgeText = 'Non validé';
+      badgeText = 'Refusé';
     } else {
-      badgeColor = const Color(AppColors.surface);
-      badgeTextColor = const Color(AppColors.textPrimary);
+      badgeColor = Colors.grey.shade200;
+      badgeTextColor = Colors.grey.shade700;
       badgeText = 'À payer';
     }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
-      ),
-      elevation: 2,
       child: Padding(
         padding: EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -122,19 +181,21 @@ class PaymentsScreen extends ConsumerWidget {
                   children: [
                     Text(
                       payment.month,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(height: 4),
                     Text(
                       'Échéance: ${_formatDate(payment.dueDate)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: badgeColor,
@@ -144,89 +205,23 @@ class PaymentsScreen extends ConsumerWidget {
                     badgeText,
                     style: TextStyle(
                       color: badgeTextColor,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.attach_money,
-                  color: Color(AppColors.accent),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${payment.amount.toStringAsFixed(0)} FCFA',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
-            ),
-            if (payment.isPaid && payment.paidDate != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: Color(AppColors.accentSoft),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Payé le: ${_formatDate(payment.paidDate!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ],
-            if (isRejected) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: Colors.red,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Le bailleur a refusé ce paiement. Merci de renvoyer une preuve ou de re-soumettre.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.grey, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Preuve optionnelle',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 16),
+            Text(
+              '${payment.amount.toStringAsFixed(0)} FCFA',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(AppColors.accent),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -235,12 +230,10 @@ class PaymentsScreen extends ConsumerWidget {
                     : null,
                 child: Text(
                   isPaid
-                      ? 'Déjà validé'
+                      ? 'Payé'
                       : isPendingValidation
-                      ? 'Validation en cours'
-                      : isRejected
-                      ? 'Renvoyer le paiement'
-                      : 'Payer / Marquer payé',
+                      ? 'En attente de validation'
+                      : 'Payer maintenant',
                 ),
               ),
             ),
@@ -250,21 +243,18 @@ class PaymentsScreen extends ConsumerWidget {
     );
   }
 
-  /// Handle payment simulation
   Future<void> _handlePayment(
     BuildContext context,
     WidgetRef ref,
     Payment payment,
   ) async {
-    if (payment.isPaid || payment.isPendingValidation) return;
-
+    // Simulation simple pour l'exemple
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer le paiement'),
         content: Text(
-          'Confirmez-vous le paiement de ${payment.amount.toStringAsFixed(2)} FCFA '
-          'pour ${payment.month} ?\n\nLe bailleur devra valider votre paiement.',
+          'Voulez-vous marquer le mois de ${payment.month} comme payé ?',
         ),
         actions: [
           TextButton(
@@ -281,28 +271,10 @@ class PaymentsScreen extends ConsumerWidget {
 
     if (confirmed == true) {
       final paymentService = ref.read(paymentServiceProvider);
-      final success = await paymentService.makePayment(payment.id);
-
-      if (!context.mounted) return;
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement envoyé pour validation')),
-        );
-        ref.invalidate(paymentsProvider); // Refresh the list
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors du paiement'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await paymentService.makePayment(payment.id);
+      ref.invalidate(paymentsProvider);
     }
   }
 
-  /// Format date for display
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 }

@@ -12,4 +12,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+console.log('Supabase Connection:', {
+  url: supabaseUrl,
+  anonKeyPresent: !!supabaseAnonKey,
+  anonKeyPrefix: supabaseAnonKey ? supabaseAnonKey.substring(0, 10) : 'none'
+});
+
 module.exports = supabase;

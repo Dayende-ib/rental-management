@@ -35,13 +35,20 @@ export default function MainLayout() {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          navigate("/login");
+          navigate("/");
           return;
         }
         const res = await api.get("/auth/profile");
-        setUser(res.data);
+        if (res.data) {
+          setUser(prev => ({ ...prev, ...res.data }));
+        }
       } catch (error) {
-        navigate("/login");
+        console.error("Erreur profil dans MainLayout:", error);
+        if (error.response?.status === 401 || !localStorage.getItem("token")) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/");
+        }
       }
     };
     fetchUser();
@@ -54,19 +61,19 @@ export default function MainLayout() {
 
   const theme = user.role === "admin"
     ? {
-        gradient: "from-[#0F3D63] to-[#1E6AA8]",
-        accent: "bg-[#0F3D63]",
-        pill: "bg-[#0F3D63]/10 text-[#0F3D63]",
-        hover: "hover:bg-[#0F3D63]/25",
-        avatar: "bg-[#0F3D63]/30",
-      }
+      gradient: "from-[#0F172A] to-[#1E293B]", // Sleek Dark Slate
+      accent: "bg-[#334155]",
+      pill: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+      hover: "hover:bg-white/10",
+      avatar: "bg-gradient-to-br from-blue-500 to-indigo-600",
+    }
     : {
-        gradient: "from-[#1C9B7E] to-[#17866C]",
-        accent: "bg-[#1C9B7E]",
-        pill: "bg-[#1C9B7E]/10 text-[#1C9B7E]",
-        hover: "hover:bg-[#1C9B7E]/25",
-        avatar: "bg-[#1C9B7E]/30",
-      };
+      gradient: "from-[#064E3B] to-[#065F46]", // Deep Emerald
+      accent: "bg-[#064E3B]",
+      pill: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+      hover: "hover:bg-white/10",
+      avatar: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    };
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -95,7 +102,7 @@ export default function MainLayout() {
 
   const navItems = [
     { name: "Tableau de bord", path: "/dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
-    { name: "Proprietes", path: "/properties", icon: Home, roles: ["admin", "manager"] },
+    { name: "Propriétés", path: "/properties", icon: Home, roles: ["admin", "manager"] },
     { name: "Locataires", path: "/tenants", icon: Users, roles: ["admin", "manager"] },
     { name: "Contrats", path: "/contracts", icon: FileText, roles: ["admin", "manager"] },
     { name: "Paiements", path: "/payments", icon: CreditCard, roles: ["admin", "manager"] },
@@ -105,49 +112,47 @@ export default function MainLayout() {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[#F8FAFC]">
       <aside
-        className={`bg-white border-r border-gray-200 transition-all duration-300 flex flex-col ${
-          sidebarOpen ? "w-64" : "w-20"
-        }`}
+        className={`bg-white border-r border-slate-200 transition-all duration-500 ease-in-out flex flex-col shadow-2xl z-30 ${sidebarOpen ? "w-72" : "w-24"
+          }`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
           {sidebarOpen ? (
             <>
-              <div className="flex items-center gap-3">
-                <div className={`p-2 bg-gradient-to-br ${theme.gradient} rounded-xl`}>
-                  <Building2 className="w-5 h-5 text-white" strokeWidth={2} />
+              <div className="flex items-center gap-4">
+                <div className={`p-2.5 bg-gradient-to-br ${theme.gradient} rounded-2xl shadow-lg shadow-emerald-900/10`}>
+                  <Building2 className="w-6 h-6 text-white" strokeWidth={2.5} />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold tracking-tight text-gray-800">PropertyFlow</h1>
+                  <h1 className="text-xl font-black tracking-tighter text-slate-900">PropriFlow</h1>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-gray-500">Gestion</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${theme.pill}`}>
-                      {user.role === "admin" ? "Admin" : "Bailleur"}
+                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${theme.pill}`}>
+                      {user.role === "admin" ? "Systems Admin" : "Premium Bailleur"}
                     </span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 transition-colors rounded-lg hover:bg-gray-100"
+                className="p-2 transition-all rounded-xl hover:bg-slate-50 text-slate-400 hover:text-slate-900"
               >
-                <X size={20} className="text-gray-600" />
+                <X size={18} />
               </button>
             </>
           ) : (
             <div className="flex items-center justify-center w-full">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 transition-colors rounded-lg hover:bg-gray-100"
+                className="p-3 transition-all rounded-2xl hover:bg-slate-50 text-slate-400 hover:text-slate-900"
               >
-                <Menu size={20} className="text-gray-600" />
+                <Menu size={22} />
               </button>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems
             .filter((item) => item.roles.includes(user.role))
             .map((item) => (
@@ -156,22 +161,23 @@ export default function MainLayout() {
                 to={item.path}
                 title={!sidebarOpen ? item.name : ""}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                    isActive
-                      ? `${theme.accent} text-white shadow-md`
-                      : "text-gray-600 hover:bg-gray-100"
+                  `group flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 ${isActive
+                    ? `bg-slate-900 text-white shadow-xl shadow-slate-200`
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
                     <item.icon
-                      size={20}
-                      className={isActive ? "text-white" : "text-gray-500"}
-                      strokeWidth={2}
+                      size={22}
+                      className={isActive ? "text-white" : "text-slate-400 group-hover:text-slate-900"}
+                      strokeWidth={isActive ? 2.5 : 2}
                     />
-                    {sidebarOpen && <span className="font-medium">{item.name}</span>}
-                    {sidebarOpen && isActive && <ChevronRight size={16} className="ml-auto" />}
+                    {sidebarOpen && <span className="font-bold tracking-tight">{item.name}</span>}
+                    {sidebarOpen && isActive && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto shadow-glow" />
+                    )}
                   </>
                 )}
               </NavLink>
@@ -179,16 +185,14 @@ export default function MainLayout() {
         </nav>
 
         {sidebarOpen && (
-          <div className="p-3 border-t border-gray-200">
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 bg-gradient-to-br ${theme.gradient} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
-                  {getInitials(user.full_name)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{user.full_name}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user.role === "admin" ? "Admin" : "Bailleur"}</p>
-                </div>
+          <div className="p-6 border-t border-slate-100 bg-slate-50/50">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 ${theme.avatar} rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg`}>
+                {getInitials(user.full_name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-slate-900 truncate">{user.full_name}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
               </div>
             </div>
           </div>
@@ -197,20 +201,23 @@ export default function MainLayout() {
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {loadingCount > 0 && (
-          <div className="h-1 w-full bg-transparent">
-            <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-emerald-500 to-purple-500 animate-pulse" />
+          <div className="h-1.5 w-full bg-slate-100 overflow-hidden">
+            <div className="h-full bg-emerald-500 animate-[progress_2s_ease-in-out_infinite]" />
           </div>
         )}
-        <header className={`bg-gradient-to-r ${theme.gradient} px-6 py-4 flex items-center justify-between shadow-md`}>
+        <header className={`bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between z-20`}>
           <div>
-            <h2 className="text-xl font-bold text-white">
-              {user.role === "admin" ? "Console Admin" : "Espace Bailleur"}
+            <h2 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">
+              {user.role === "admin" ? "Executive Console" : "Gestion Immobilière"}
             </h2>
-            <p className="text-sm text-white text-opacity-80">
-              {user.role === "admin"
-                ? "Supervision globale de la plateforme"
-                : "Gerez vos biens et vos locataires"}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                {user.role === "admin"
+                  ? "Plateforme en ligne - Maintenance globale"
+                  : "Patrimoine sécurisé - Mode Gestionnaire"}
+              </p>
+            </div>
           </div>
 
           <div ref={profileRef} className="relative">
@@ -219,8 +226,8 @@ export default function MainLayout() {
               className={`flex items-center gap-3 px-3 py-2 transition-colors rounded-xl ${theme.hover}`}
             >
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-medium text-white">{user.full_name}</p>
-                <p className="text-xs text-white capitalize text-opacity-80">{user.role === "admin" ? "Admin" : "Bailleur"}</p>
+                <p className="text-sm font-medium text-slate-700">{user.full_name}</p>
+                <p className="text-xs text-slate-500 capitalize">{user.role === "admin" ? "Admin" : "Bailleur"}</p>
               </div>
               <div className={`flex items-center justify-center w-10 h-10 font-bold text-white border border-white border-opacity-30 rounded-full backdrop-blur-sm ${theme.avatar}`}>
                 {getInitials(user.full_name)}

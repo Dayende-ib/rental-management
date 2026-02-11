@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const createUserClient = require('../config/supabaseUser');
 
 /**
  * @swagger
@@ -42,13 +43,17 @@ const register = async (req, res, next) => {
         }
 
         if (authData.user) {
-            const { error: profileError } = await supabase
+            // Utiliser le client authentifié pour créer le profil respectant la RLS
+            const sessionToken = authData.session?.access_token;
+            const userClient = sessionToken ? createUserClient(sessionToken) : supabase;
+
+            const { error: profileError } = await userClient
                 .from('profiles')
                 .insert([
                     {
                         id: authData.user.id,
                         full_name,
-                        role: role || 'tenant',
+                        role: role || 'manager',
                     }
                 ]);
 
@@ -58,6 +63,7 @@ const register = async (req, res, next) => {
         res.status(201).json({
             message: 'User registered successfully',
             user: authData.user,
+            session: authData.session,
         });
     } catch (err) {
         next(err);
@@ -102,7 +108,8 @@ const logout = async (req, res, next) => {
 
 const getProfile = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('profiles')
             .select('*')
             .eq('id', req.user.id)
@@ -118,7 +125,8 @@ const getProfile = async (req, res, next) => {
 
 const updateProfile = async (req, res, next) => {
     try {
-        const { data, error } = await supabase
+        const userClient = createUserClient(req.token);
+        const { data, error } = await userClient
             .from('profiles')
             .update(req.body)
             .eq('id', req.user.id)

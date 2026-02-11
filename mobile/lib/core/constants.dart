@@ -42,11 +42,11 @@ class AppConstants {
   static const String logoutEndpoint = '/auth/logout';
   static const String refreshEndpoint = '/auth/refresh-session';
   static const String profileEndpoint = '/auth/profile';
-  static const String tenantProfileEndpoint = '/tenants/me';
-  static const String paymentsEndpoint = '/payments';
-  static const String maintenanceEndpoint = '/maintenance';
-  static const String propertiesEndpoint = '/properties';
-  static const String contractsEndpoint = '/contracts';
+  static const String tenantProfileEndpoint = '/mobile/me';
+  static const String paymentsEndpoint = '/mobile/payments';
+  static const String maintenanceEndpoint = '/mobile/maintenance';
+  static const String propertiesEndpoint = '/mobile/properties';
+  static const String contractsEndpoint = '/mobile/contracts';
 
   // Storage Keys
   static const String tokenKey = 'jwt_token';

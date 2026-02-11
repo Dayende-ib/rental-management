@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import { Building2, LogIn, Mail, Lock, ArrowRight, Eye, EyeOff, Sparkles } from "lucide-react";
@@ -13,6 +13,14 @@ export default function ImprovedLogin() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      console.log("Token trouvé (Login), redirection vers dashboard...");
+      navigate("/dashboard");
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -179,11 +187,10 @@ export default function ImprovedLogin() {
                       type="email"
                       required
                       placeholder="exemple@email.com"
-                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${
-                        focusedField === 'email'
-                          ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
-                          : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3.5 pl-12 border-2 rounded-2xl transition-all duration-300 outline-none ${focusedField === 'email'
+                        ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                        }`}
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
@@ -191,11 +198,10 @@ export default function ImprovedLogin() {
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
                     />
-                    <Mail 
-                      size={18} 
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${
-                        focusedField === 'email' ? 'text-[#1C9B7E]' : 'text-gray-400'
-                      }`}
+                    <Mail
+                      size={18}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'email' ? 'text-[#1C9B7E]' : 'text-gray-400'
+                        }`}
                     />
                   </div>
                 </div>
@@ -213,11 +219,10 @@ export default function ImprovedLogin() {
                       type={showPassword ? "text" : "password"}
                       required
                       placeholder="••••••••"
-                      className={`w-full px-4 py-3.5 pl-12 pr-12 border-2 rounded-2xl transition-all duration-300 outline-none ${
-                        focusedField === 'password'
-                          ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
-                          : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
-                      }`}
+                      className={`w-full px-4 py-3.5 pl-12 pr-12 border-2 rounded-2xl transition-all duration-300 outline-none ${focusedField === 'password'
+                        ? 'border-[#1C9B7E] bg-[#1C9B7E]/5 shadow-lg shadow-[#1C9B7E]/20'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                        }`}
                       value={formData.password}
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })
@@ -225,11 +230,10 @@ export default function ImprovedLogin() {
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
                     />
-                    <Lock 
-                      size={18} 
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${
-                        focusedField === 'password' ? 'text-[#1C9B7E]' : 'text-gray-400'
-                      }`}
+                    <Lock
+                      size={18}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'password' ? 'text-[#1C9B7E]' : 'text-gray-400'
+                        }`}
                     />
                     <button
                       type="button"
@@ -261,7 +265,7 @@ export default function ImprovedLogin() {
                 >
                   {/* Button shimmer effect */}
                   <div className="absolute inset-0 transition-transform duration-1000 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full" />
-                  
+
                   <div className="relative flex items-center justify-center gap-3">
                     {loading ? (
                       <>
