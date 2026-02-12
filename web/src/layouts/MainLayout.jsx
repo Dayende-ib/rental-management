@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Building2,
   FileText,
-  Bell,
 } from "lucide-react";
 import api from "../services/api";
 import { subscribeLoading } from "../services/loadingStore";
@@ -124,7 +123,6 @@ export default function MainLayout() {
     { name: "Paiements", path: "/payments", icon: CreditCard, roles: ["admin", "manager"] },
     { name: "Maintenance", path: "/maintenance", icon: Wrench, roles: ["admin", "manager"] },
     { name: "Utilisateurs", path: "/users", icon: UserCog, roles: ["admin"] },
-    { name: "Notifications", path: "/notifications", icon: Bell, roles: ["admin", "manager"] },
   ];
 
   return (

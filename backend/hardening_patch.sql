@@ -288,6 +288,7 @@ WITH CHECK (
           AND t.user_id = auth.uid()
     )
     AND due_date >= date_trunc('month', now()) + interval '1 month'
+    AND due_date < date_trunc('month', now()) + interval '2 month'
 );
 CREATE POLICY payments_tenant_update_own ON payments
 FOR UPDATE TO authenticated

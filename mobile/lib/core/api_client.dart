@@ -164,6 +164,8 @@ class ApiClient {
       throw ApiException('No internet connection', 0);
     } on TimeoutException {
       throw ApiException('Request timeout', 0);
+    } on ApiException {
+      rethrow;
     } catch (e) {
       throw ApiException('Network error: $e', 0);
     }
@@ -255,6 +257,8 @@ class ApiClient {
       throw ApiException('No internet connection', 0);
     } on TimeoutException {
       throw ApiException('Request timeout', 0);
+    } on ApiException {
+      rethrow;
     } catch (e) {
       throw ApiException('Network error: $e', 0);
     }

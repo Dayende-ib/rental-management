@@ -111,6 +111,11 @@ class Payment {
   final String
   validationStatus; // 'not_submitted', 'pending', 'validated', 'rejected'
   final double lateFee;
+  final List<String> proofUrls;
+  final String validationNotes;
+  final String rejectionReason;
+  final DateTime? validatedAt;
+  final String validatedBy;
 
   Payment({
     required this.id,
@@ -123,6 +128,11 @@ class Payment {
     this.paidDate,
     this.validationStatus = 'validated',
     this.lateFee = 0.0,
+    this.proofUrls = const [],
+    this.validationNotes = '',
+    this.rejectionReason = '',
+    this.validatedAt,
+    this.validatedBy = '',
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) {
@@ -144,6 +154,13 @@ class Payment {
         : _formatMonth(dueDate);
     final validation = (json['validationStatus'] ?? json['validation_status'])
         ?.toString();
+    final proofRaw = json['proof_urls'];
+    final proofUrls = proofRaw is List
+        ? proofRaw
+              .map((e) => e?.toString() ?? '')
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
 
     return Payment(
       id: (json['id'] ?? '').toString(),
@@ -156,6 +173,11 @@ class Payment {
       paidDate: paidDate,
       validationStatus: validation ?? _mapValidationFromStatus(status),
       lateFee: _parseDouble(json['late_fee']),
+      proofUrls: proofUrls,
+      validationNotes: (json['validation_notes'] ?? '').toString(),
+      rejectionReason: (json['rejection_reason'] ?? '').toString(),
+      validatedAt: _parseDate(json['validated_at']),
+      validatedBy: (json['validated_by'] ?? '').toString(),
     );
   }
 
@@ -177,6 +199,33 @@ class Payment {
       dueDate: DateTime.now(),
       validationStatus: '',
       lateFee: 0.0,
+      proofUrls: const [],
+      validationNotes: '',
+      rejectionReason: '',
+      validatedBy: '',
+    );
+  }
+}
+
+/// Payment overview for mobile payment cards:
+/// - paid payments history
+/// - next month upcoming payment only
+class PaymentOverview {
+  final List<Payment> paidPayments;
+  final Payment? upcomingNextMonth;
+  final String? nextMonthLabel;
+
+  PaymentOverview({
+    required this.paidPayments,
+    required this.upcomingNextMonth,
+    this.nextMonthLabel,
+  });
+
+  factory PaymentOverview.empty() {
+    return PaymentOverview(
+      paidPayments: const [],
+      upcomingNextMonth: null,
+      nextMonthLabel: null,
     );
   }
 }

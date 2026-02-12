@@ -1,4 +1,3 @@
-const supabase = require('../config/supabase');
 const createUserClient = require('../config/supabaseUser');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const { resolveTenant } = require('../utils/tenantResolver');
@@ -94,6 +93,72 @@ const getPayments = async (req, res, next) => {
         }
 
         res.status(200).json(buildListResponse(data || [], pagination, total));
+    } catch (err) {
+        next(err);
+    }
+};
+
+const getPaymentsOverview = async (req, res, next) => {
+    try {
+        const userClient = createUserClient(req.token);
+        const tenant = await resolveTenant(userClient, req.user);
+        if (!tenant) {
+            return res.status(404).json({ error: 'Tenant profile not found' });
+        }
+
+        const { data: contracts, error: contractsError } = await userClient
+            .from('contracts')
+            .select('id')
+            .eq('tenant_id', tenant.id);
+
+        if (contractsError) throw contractsError;
+        const contractIds = (contracts || [])
+            .map((c) => String(c.id || '').trim())
+            .filter(Boolean);
+
+        if (!contractIds.length) {
+            return res.status(200).json({
+                paid: [],
+                upcoming_next_month: null,
+                meta: { next_month: formatIsoMonth(getNextMonthStartUtc()) },
+            });
+        }
+
+        const { data: payments, error: paymentsError } = await userClient
+            .from('payments')
+            .select('*, contracts(id, tenant_id, property_id, properties(title, address))')
+            .in('contract_id', contractIds)
+            .order('due_date', { ascending: false });
+
+        if (paymentsError) throw paymentsError;
+        const rows = Array.isArray(payments) ? payments : [];
+
+        const nextMonthStart = getNextMonthStartUtc();
+        const nextMonthEnd = getMonthEndUtc(nextMonthStart);
+        let upcoming = null;
+        const paid = [];
+
+        for (const payment of rows) {
+            const status = String(payment?.status || '').toLowerCase();
+            const validationStatus = String(payment?.validation_status || '').toLowerCase();
+            const dueDate = toUtcDate(payment?.due_date);
+            const isPaid = status === 'paid' || validationStatus === 'validated';
+
+            if (isPaid) {
+                paid.push(payment);
+                continue;
+            }
+
+            if (dueDate && dueDate >= nextMonthStart && dueDate <= nextMonthEnd && !upcoming) {
+                upcoming = payment;
+            }
+        }
+
+        return res.status(200).json({
+            paid,
+            upcoming_next_month: upcoming,
+            meta: { next_month: formatIsoMonth(nextMonthStart) },
+        });
     } catch (err) {
         next(err);
     }
@@ -232,7 +297,6 @@ const createTenantManualPayment = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
         const hasServiceRoleKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-        const paymentWriter = hasServiceRoleKey ? supabaseAdmin : userClient;
         const tenant = await resolveTenant(userClient, req.user);
         if (!tenant) {
             return res.status(404).json({ error: 'Tenant profile not found' });
@@ -252,17 +316,16 @@ const createTenantManualPayment = async (req, res, next) => {
             return res.status(400).json({ error: 'No active contract found for this tenant' });
         }
 
-        const now = new Date();
-        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const nextMonthStart = getNextMonthStartUtc();
 
         const rawDueDate = req.body?.due_date ? new Date(req.body.due_date) : null;
         if (!rawDueDate || Number.isNaN(rawDueDate.getTime())) {
             return res.status(400).json({ error: 'due_date is required and must be a valid date' });
         }
 
-        const dueMonthStart = new Date(rawDueDate.getFullYear(), rawDueDate.getMonth(), 1);
-        if (dueMonthStart <= currentMonthStart) {
-            return res.status(400).json({ error: 'Payment month must be in the future' });
+        const dueMonthStart = normalizeMonthStartUtc(rawDueDate);
+        if (dueMonthStart.getTime() !== nextMonthStart.getTime()) {
+            return res.status(400).json({ error: 'Manual payment can only be created for the next month' });
         }
 
         const amountInput = Number(req.body?.amount);
@@ -273,28 +336,42 @@ const createTenantManualPayment = async (req, res, next) => {
         }
 
         const month = formatMonthLabel(dueMonthStart);
-        const { data, error } = await paymentWriter
+        const paymentPayload = {
+            contract_id: contract.id,
+            month,
+            amount,
+            due_date: dueMonthStart.toISOString(),
+            status: 'pending',
+            validation_status: 'not_submitted',
+            late_fee: 0,
+        };
+
+        let data = null;
+        let error = null;
+
+        const userInsert = await userClient
             .from('payments')
-            .insert([{
-                contract_id: contract.id,
-                month,
-                amount,
-                due_date: dueMonthStart.toISOString(),
-                status: 'pending',
-                validation_status: 'not_submitted',
-                late_fee: 0,
-            }])
+            .insert([paymentPayload])
             .select();
+        data = userInsert.data;
+        error = userInsert.error;
+
+        if (error && (error.code === '42501' || error.code === '401') && hasServiceRoleKey) {
+            const adminInsert = await supabaseAdmin
+                .from('payments')
+                .insert([paymentPayload])
+                .select();
+            data = adminInsert.data;
+            error = adminInsert.error;
+        }
 
         if (error) {
             if (error.code === '23505') {
                 return res.status(409).json({ error: 'A payment already exists for this contract and month' });
             }
-            if (error.code === '42501') {
+            if (error.code === '42501' || error.code === '401') {
                 return res.status(403).json({
-                    error: hasServiceRoleKey
-                        ? 'Permission denied while creating payment'
-                        : 'Permission denied by RLS. Apply the hardening SQL patch to allow tenant manual payment creation.',
+                    error: 'Permission denied by RLS. Apply the hardening SQL patch for payments tenant insert.',
                 });
             }
             throw error;
@@ -308,6 +385,7 @@ const createTenantManualPayment = async (req, res, next) => {
 const validatePayment = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const { validation_notes } = req.body || {};
         const userClient = createUserClient(req.token);
 
         const { data, error } = await userClient
@@ -318,6 +396,7 @@ const validatePayment = async (req, res, next) => {
                 payment_date: new Date().toISOString().split('T')[0],
                 validated_by: req.user.id,
                 validated_at: new Date().toISOString(),
+                validation_notes: validation_notes || null,
                 rejection_reason: null,
             })
             .eq('id', id)
@@ -334,7 +413,7 @@ const validatePayment = async (req, res, next) => {
 const rejectPayment = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { rejection_reason } = req.body || {};
+        const { rejection_reason, validation_notes } = req.body || {};
         const userClient = createUserClient(req.token);
 
         const { data, error } = await userClient
@@ -343,6 +422,7 @@ const rejectPayment = async (req, res, next) => {
                 validation_status: 'rejected',
                 status: 'pending',
                 rejection_reason: rejection_reason || 'Payment proof rejected',
+                validation_notes: validation_notes || null,
                 validated_by: req.user.id,
                 validated_at: new Date().toISOString(),
             })
@@ -359,6 +439,7 @@ const rejectPayment = async (req, res, next) => {
 
 module.exports = {
     getPayments,
+    getPaymentsOverview,
     createPayment,
     createTenantManualPayment,
     updatePayment,
@@ -381,6 +462,31 @@ function sanitizeTenantPaymentUpdate(input) {
 function formatMonthLabel(date) {
     const monthName = date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
     return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+}
+
+function normalizeMonthStartUtc(date) {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function getNextMonthStartUtc(reference = new Date()) {
+    return new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 1));
+}
+
+function getMonthEndUtc(monthStart) {
+    return new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+}
+
+function toUtcDate(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+}
+
+function formatIsoMonth(date) {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
 }
 
 

@@ -42,10 +42,52 @@ final paymentsProvider = FutureProvider.autoDispose<List<Payment>>((ref) async {
   }
 });
 
+/// Payment overview provider for payment cards screen
+final paymentOverviewProvider = FutureProvider.autoDispose<PaymentOverview>((
+  ref,
+) async {
+  final paymentService = ref.watch(paymentServiceProvider);
+  final connectivityService = ref.watch(connectivityServiceProvider);
+  final isConnected = await connectivityService.isConnected();
+
+  if (!isConnected) {
+    // Offline fallback from local cache.
+    final cached = await ref.watch(databaseHelperProvider).getPayments();
+    final paid = cached.where((p) => p.isPaid || p.isValidated).toList()
+      ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
+
+    final now = DateTime.now();
+    final nextMonthStart = DateTime(now.year, now.month + 1, 1);
+    final nextMonthEnd = DateTime(now.year, now.month + 2, 0, 23, 59, 59);
+    Payment? upcoming;
+    for (final p in cached) {
+      final due = p.dueDate;
+      final isPaid = p.isPaid || p.isValidated;
+      if (!isPaid &&
+          !due.isBefore(nextMonthStart) &&
+          !due.isAfter(nextMonthEnd)) {
+        upcoming = p;
+        break;
+      }
+    }
+
+    return PaymentOverview(
+      paidPayments: paid,
+      upcomingNextMonth: upcoming,
+      nextMonthLabel:
+          '${nextMonthStart.year}-${nextMonthStart.month.toString().padLeft(2, '0')}',
+    );
+  }
+
+  final overview = await paymentService.getPaymentOverview();
+  return overview;
+});
+
 /// Provider to refresh payments
 final refreshPaymentsProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     ref.invalidate(paymentsProvider);
+    ref.invalidate(paymentOverviewProvider);
   };
 });
 

@@ -151,7 +151,7 @@ class ProfileScreen extends ConsumerWidget {
               right: -50,
               child: CircleAvatar(
                 radius: 100,
-                backgroundColor: Colors.white.withOpacity(0.05),
+                backgroundColor: Colors.white.withAlpha(5),
               ),
             ),
             Column(
@@ -195,7 +195,7 @@ class ProfileScreen extends ConsumerWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withAlpha(20),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
@@ -262,7 +262,7 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withAlpha(3),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -273,7 +273,7 @@ class ProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(AppColors.accent).withOpacity(0.08),
+              color: const Color(AppColors.accent).withAlpha(8),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(icon, color: const Color(AppColors.accent), size: 24),
@@ -342,7 +342,7 @@ class ProfileScreen extends ConsumerWidget {
         minimumSize: const Size(double.infinity, 64),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.red.withOpacity(0.1), width: 1.5),
+          side: BorderSide(color: Colors.red.withAlpha(10), width: 1.5),
         ),
       ),
       child: const Row(
@@ -374,7 +374,7 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withAlpha(10),
                 shape: BoxShape.circle,
               ),
               child: const Icon(

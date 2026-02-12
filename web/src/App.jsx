@@ -10,7 +10,6 @@ import Payments from "./pages/Payments";
 import Maintenance from "./pages/Maintenance";
 import Contracts from "./pages/Contracts";
 import Users from "./pages/Users";
-import Notifications from "./pages/Notifications";
 
 
 // Layout
@@ -34,7 +33,6 @@ function App() {
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/contracts" element={<Contracts />} />
           <Route path="/users" element={<Users />} />
-          <Route path="/notifications" element={<Notifications />} />
         </Route>
       </Routes>
     </BrowserRouter>

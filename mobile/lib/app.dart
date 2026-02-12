@@ -120,7 +120,8 @@ class _RentalAppState extends State<RentalApp> {
     );
 
     return MaterialApp(
-      title: 'Rental Management',
+      title: 'PropiFlow',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

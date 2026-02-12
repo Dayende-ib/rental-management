@@ -410,17 +410,31 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   Widget _buildPropertyCard(AvailablePropertyItem item) {
     final property = item.property;
     final status = item.status.toLowerCase();
+    final isUnavailable = status.isNotEmpty && status != 'available';
+    final isRented = status == 'rented';
     String statusLabel;
+    Color statusBgColor;
+    Color statusTextColor;
     if (status.isEmpty || status == 'available') {
       statusLabel = 'Disponible';
+      statusBgColor = const Color(AppColors.accentLight);
+      statusTextColor = const Color(AppColors.accent);
     } else if (status == 'rented') {
-      statusLabel = 'Loue';
+      statusLabel = 'Indisponible';
+      statusBgColor = Colors.red.shade100;
+      statusTextColor = Colors.red.shade800;
     } else if (status == 'maintenance') {
       statusLabel = 'Maintenance';
+      statusBgColor = Colors.orange.shade100;
+      statusTextColor = Colors.orange.shade800;
     } else if (status == 'sold') {
       statusLabel = 'Vendu';
+      statusBgColor = Colors.grey.shade300;
+      statusTextColor = Colors.grey.shade800;
     } else {
       statusLabel = item.status;
+      statusBgColor = Colors.grey.shade200;
+      statusTextColor = Colors.grey.shade800;
     }
     final rentText = property.monthlyRent > 0
         ? '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois'
@@ -473,13 +487,13 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(AppColors.accentLight),
+                    color: statusBgColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     statusLabel,
-                    style: const TextStyle(
-                      color: Color(AppColors.accent),
+                    style: TextStyle(
+                      color: statusTextColor,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -540,12 +554,20 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _requestRental(context, property),
+                  onPressed: isUnavailable
+                      ? null
+                      : () => _requestRental(context, property),
                   icon: const Icon(Icons.key),
-                  label: const Text('Louer ce bien'),
+                  label: Text(isRented ? 'Bien indisponible' : 'Louer ce bien'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(AppColors.accent),
-                    foregroundColor: Colors.white,
+                    backgroundColor: isUnavailable
+                        ? Colors.red.shade100
+                        : const Color(AppColors.accent),
+                    foregroundColor: isUnavailable
+                        ? Colors.red.shade800
+                        : Colors.white,
+                    disabledBackgroundColor: Colors.red.shade100,
+                    disabledForegroundColor: Colors.red.shade800,
                   ),
                 ),
               ),
