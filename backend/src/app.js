@@ -5,6 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const errorHandler = require('./middlewares/errorHandler');
 const requestContext = require('./middlewares/requestContext');
+const errorResponseTranslator = require('./middlewares/errorResponseTranslator');
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 app.use(requestContext);
 app.use(morgan(':date[iso] :request-id :method :url :status :response-time ms'));
 app.use(express.json({ limit: '1mb' }));
+app.use(errorResponseTranslator);
 
 // Swagger Documentation
 const swaggerOptions = {

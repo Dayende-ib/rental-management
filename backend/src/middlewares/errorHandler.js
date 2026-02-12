@@ -1,3 +1,5 @@
+const { translateErrorMessage, fallbackByStatus } = require('../utils/userFacingErrors');
+
 const errorHandler = (err, req, res, next) => {
     const requestId = req?.requestId || '-';
 
@@ -18,7 +20,8 @@ const errorHandler = (err, req, res, next) => {
         status = 400; // Bad Request (RAISE EXCEPTION in PL/pgSQL)
     }
 
-    const message = err.message || (typeof err === 'string' ? err : 'Internal Server Error');
+    const rawMessage = err.message || (typeof err === 'string' ? err : '');
+    const message = translateErrorMessage(rawMessage, status) || fallbackByStatus(status);
 
     res.status(status).json({
         error: {

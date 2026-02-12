@@ -38,19 +38,21 @@ class ApiClient {
         }
         return json.decode(response.body);
       } catch (e) {
-        throw ApiException('Invalid response format', response.statusCode);
+        throw ApiException(
+          'La reponse du serveur est invalide. Reessayez dans quelques instants.',
+          response.statusCode,
+        );
       }
     } else {
-      String message = 'Request failed with status ${response.statusCode}';
+      String message = _fallbackByStatus(response.statusCode);
       try {
         final body = json.decode(response.body);
         if (body is Map<String, dynamic>) {
-          message =
-              body['error']?.toString() ??
-              body['message']?.toString() ??
-              message;
+          message = _extractErrorMessage(body, response.statusCode);
         }
-      } catch (_) {}
+      } catch (_) {
+        message = _fallbackByStatus(response.statusCode);
+      }
       throw ApiException(message, response.statusCode);
     }
   }
@@ -96,7 +98,10 @@ class ApiClient {
     if (data is Map<String, dynamic>) {
       return data;
     }
-    throw ApiException('Unexpected response format', response.statusCode);
+    throw ApiException(
+      'Le serveur a renvoye un format inattendu. Rafraichissez puis reessayez.',
+      response.statusCode,
+    );
   }
 
   /// GET request with authentication
@@ -132,7 +137,10 @@ class ApiClient {
     if (data is Map<String, dynamic>) {
       return data;
     }
-    throw ApiException('Unexpected response format', response.statusCode);
+    throw ApiException(
+      'Le serveur a renvoye un format inattendu. Rafraichissez puis reessayez.',
+      response.statusCode,
+    );
   }
 
   /// PUT request with authentication
@@ -159,15 +167,27 @@ class ApiClient {
       if (data is Map<String, dynamic>) {
         return data;
       }
-      throw ApiException('Unexpected response format', response.statusCode);
+      throw ApiException(
+        'Le serveur a renvoye un format inattendu. Rafraichissez puis reessayez.',
+        response.statusCode,
+      );
     } on SocketException {
-      throw ApiException('No internet connection', 0);
+      throw ApiException(
+        'Connexion internet indisponible. Verifiez votre reseau puis reessayez.',
+        0,
+      );
     } on TimeoutException {
-      throw ApiException('Request timeout', 0);
+      throw ApiException(
+        "Le serveur met trop de temps a repondre. Reessayez dans quelques instants.",
+        0,
+      );
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Network error: $e', 0);
+      throw ApiException(
+        "Une erreur reseau est survenue. Verifiez votre connexion puis reessayez.",
+        0,
+      );
     }
   }
 
@@ -214,7 +234,10 @@ class ApiClient {
         return fromItems;
       }
     }
-    throw ApiException('Unexpected response format', response.statusCode);
+    throw ApiException(
+      'Le serveur a renvoye un format inattendu. Rafraichissez puis reessayez.',
+      response.statusCode,
+    );
   }
 
   /// POST multipart request with file upload
@@ -252,15 +275,27 @@ class ApiClient {
       if (data is Map<String, dynamic>) {
         return data;
       }
-      throw ApiException('Unexpected response format', response.statusCode);
+      throw ApiException(
+        'Le serveur a renvoye un format inattendu. Rafraichissez puis reessayez.',
+        response.statusCode,
+      );
     } on SocketException {
-      throw ApiException('No internet connection', 0);
+      throw ApiException(
+        'Connexion internet indisponible. Verifiez votre reseau puis reessayez.',
+        0,
+      );
     } on TimeoutException {
-      throw ApiException('Request timeout', 0);
+      throw ApiException(
+        "Le serveur met trop de temps a repondre. Reessayez dans quelques instants.",
+        0,
+      );
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Network error: $e', 0);
+      throw ApiException(
+        "Une erreur reseau est survenue. Verifiez votre connexion puis reessayez.",
+        0,
+      );
     }
   }
 
@@ -330,5 +365,72 @@ class ApiException implements Exception {
   ApiException(this.message, this.statusCode);
 
   @override
-  String toString() => 'ApiException: $message (Status: $statusCode)';
+  String toString() => message;
+}
+
+String _extractErrorMessage(Map<String, dynamic> body, int statusCode) {
+  final errorValue = body['error'];
+
+  if (errorValue is String && errorValue.trim().isNotEmpty) {
+    return _localizeServerMessage(errorValue.trim(), statusCode);
+  }
+
+  if (errorValue is Map<String, dynamic>) {
+    final nested = errorValue['message'];
+    if (nested is String && nested.trim().isNotEmpty) {
+      return _localizeServerMessage(nested.trim(), statusCode);
+    }
+  }
+
+  final messageValue = body['message'];
+  if (messageValue is String && messageValue.trim().isNotEmpty) {
+    return _localizeServerMessage(messageValue.trim(), statusCode);
+  }
+
+  return _fallbackByStatus(statusCode);
+}
+
+String _localizeServerMessage(String rawMessage, int statusCode) {
+  final lower = rawMessage.toLowerCase();
+
+  if (lower.contains('session') && lower.contains('expire')) {
+    return 'Votre session a expire. Reconnectez-vous pour continuer.';
+  }
+  if (lower.contains('permission') || lower.contains('forbidden')) {
+    return "Action non autorisee pour votre compte. Contactez l'administrateur si besoin.";
+  }
+  if (lower.contains('introuvable') || lower.contains('not found')) {
+    return 'Element introuvable. Rafraichissez la page puis reessayez.';
+  }
+  if (lower.contains('deja') || lower.contains('already exists')) {
+    return 'Cette operation existe deja. Verifiez les informations puis reessayez.';
+  }
+
+  if (rawMessage.trim().isEmpty) {
+    return _fallbackByStatus(statusCode);
+  }
+  return rawMessage;
+}
+
+String _fallbackByStatus(int statusCode) {
+  switch (statusCode) {
+    case 400:
+      return 'Demande invalide. Verifiez les informations saisies puis reessayez.';
+    case 401:
+      return 'Session invalide ou expiree. Reconnectez-vous pour continuer.';
+    case 403:
+      return "Action non autorisee pour votre compte.";
+    case 404:
+      return 'Element introuvable. Rafraichissez puis reessayez.';
+    case 409:
+      return "Conflit detecte. L'operation a deja ete effectuee.";
+    case 422:
+      return 'Donnees invalides. Corrigez les champs puis reessayez.';
+    case 429:
+      return 'Trop de tentatives. Patientez avant de recommencer.';
+    case 500:
+      return 'Erreur serveur temporaire. Reessayez dans quelques instants.';
+    default:
+      return 'Une erreur est survenue. Veuillez reessayer.';
+  }
 }
