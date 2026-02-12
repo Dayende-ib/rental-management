@@ -1,40 +1,50 @@
+import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Pages
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Properties from "./pages/Properties";
-import Tenants from "./pages/Tenants";
-import Payments from "./pages/Payments";
-import Maintenance from "./pages/Maintenance";
-import Contracts from "./pages/Contracts";
-import Users from "./pages/Users";
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Properties = lazy(() => import("./pages/Properties"));
+const Tenants = lazy(() => import("./pages/Tenants"));
+const Payments = lazy(() => import("./pages/Payments"));
+const Maintenance = lazy(() => import("./pages/Maintenance"));
+const Contracts = lazy(() => import("./pages/Contracts"));
+const Users = lazy(() => import("./pages/Users"));
 
 
 // Layout
-import MainLayout from "./layouts/MainLayout";
+const MainLayout = lazy(() => import("./layouts/MainLayout"));
+
+function RouteLoader() {
+  return (
+    <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center">
+      <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
+    </div>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Page login */}
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
+          {/* Page login */}
+          <Route path="/" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Toutes les pages avec sidebar */}
-        <Route element={<MainLayout />}>
-          
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/properties" element={<Properties />} />
-          <Route path="/tenants" element={<Tenants />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/maintenance" element={<Maintenance />} />
-          <Route path="/contracts" element={<Contracts />} />
-          <Route path="/users" element={<Users />} />
-        </Route>
-      </Routes>
+          {/* Toutes les pages avec sidebar */}
+          <Route element={<MainLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/properties" element={<Properties />} />
+            <Route path="/tenants" element={<Tenants />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/contracts" element={<Contracts />} />
+            <Route path="/users" element={<Users />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
