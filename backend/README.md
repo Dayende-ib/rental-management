@@ -123,6 +123,26 @@ Or using Docker Compose:
 docker compose up --build
 ```
 
+## 🚂 Deploy on Railway
+
+This backend is ready for Railway deployment (`railway.json` included).
+
+1. Create a new Railway project and connect your GitHub repository.
+2. Set the service root directory to `backend`.
+3. Add the required environment variables:
+   - `PORT=5000` (Railway may override automatically)
+   - `NODE_ENV=production`
+   - `SUPABASE_URL=...`
+   - `SUPABASE_ANON_KEY=...`
+   - `SUPABASE_SERVICE_ROLE_KEY=...`
+   - `JWT_SECRET=...`
+4. Deploy the service.
+5. Verify health endpoint:
+   - `https://<your-railway-domain>/health`
+
+Then configure your web app (Vercel) with:
+`VITE_API_BASE_URL=https://<your-railway-domain>/api`
+
 ## 📝 Database Schema
 
 Key entities:

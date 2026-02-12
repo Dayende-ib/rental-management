@@ -1,8 +1,13 @@
 import axios from "axios";
 import { incrementLoading, decrementLoading } from "./loadingStore";
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "/api";
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: apiBaseUrl,
 });
 
 api.interceptors.request.use(

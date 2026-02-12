@@ -33,9 +33,10 @@ A powerful React-based Single Page Application (SPA) for property managers and a
     ```
 
 3.  **Environment Variables**:
-    Create `.env` (optional, defaults are usually fine for dev):
+    Create `.env` (optional in local dev):
     ```ini
-    VITE_API_URL=http://localhost:5000/api
+    # Recommended variable (used in production and local)
+    VITE_API_BASE_URL=http://localhost:5000/api
     ```
 
 4.  **Start Development Server**:
@@ -85,4 +86,19 @@ npm run build
 ```
 
 The output will be in the `dist/` directory, ready to be served by Nginx, Apache, or Vercel/Netlify.
+
+## 🚀 Deploy on Vercel
+
+1. Connect your GitHub repository to Vercel.
+2. Set project root directory to `web`.
+3. Vercel build settings:
+   - Build command: `npm run build`
+   - Output directory: `dist`
+4. Add environment variable in Vercel:
+   - `VITE_API_BASE_URL=https://<your-railway-backend-domain>/api`
+5. Deploy.
+
+Notes:
+- `vercel.json` is already configured for SPA routing fallback.
+- The web app uses `VITE_API_BASE_URL` first, then `VITE_API_URL`, then `/api` as fallback.
 
