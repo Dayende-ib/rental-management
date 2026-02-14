@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../services/api";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 import {
   UserCog,
   Plus,
@@ -84,6 +85,10 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers(page);
   }, [page, fetchUsers]);
+
+  useRealtimeRefresh(() => {
+    fetchUsers(page);
+  }, ["users"]);
 
   const resetForm = () => {
     setFormData({

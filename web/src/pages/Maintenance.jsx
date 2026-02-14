@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
 import PaginationControls from "../components/PaginationControls";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 import {
   Wrench,
   Plus,
@@ -153,6 +154,12 @@ export default function MaintenanceRequests() {
     fetchTenants();
   }, []);
 
+  useRealtimeRefresh(() => {
+    fetchRequests(page);
+    fetchProperties();
+    fetchTenants();
+  }, ["maintenance", "properties", "tenants"]);
+
   useEffect(() => {
     const fetchRole = async () => {
       try {
@@ -164,6 +171,8 @@ export default function MaintenanceRequests() {
     };
     fetchRole();
   }, []);
+
+  const canManageMaintenance = userRole === "manager";
 
   useEffect(() => {
     if (showForm) {
@@ -204,6 +213,7 @@ export default function MaintenanceRequests() {
   });
 
   const updateStatus = async (id, status) => {
+    if (!canManageMaintenance) return;
     try {
       await api.put(`/maintenance/${id}`, { status });
       fetchRequests(page);
@@ -369,21 +379,23 @@ export default function MaintenanceRequests() {
         </div>
 
         {/* Quick Status Actions */}
-        <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-2">
-          {["pending", "in_progress", "completed", "cancelled"].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => updateStatus(request.id, s)}
-              className="px-3 py-1 text-xs font-semibold rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100"
-            >
-              {s === "pending" && "En attente"}
-              {s === "in_progress" && "En cours"}
-              {s === "completed" && "Termine"}
-              {s === "cancelled" && "Annule"}
-            </button>
-          ))}
-        </div>
+        {canManageMaintenance && (
+          <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+            {["pending", "in_progress", "completed", "cancelled"].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => updateStatus(request.id, s)}
+                className="px-3 py-1 text-xs font-semibold rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100"
+              >
+                {s === "pending" && "En attente"}
+                {s === "in_progress" && "En cours"}
+                {s === "completed" && "Termine"}
+                {s === "cancelled" && "Annule"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -34,7 +34,17 @@ class HomeScreen extends ConsumerWidget {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 12),
-                    _buildPropertyCard(context, ref, dashboardData.property),
+                    _buildPropertyCard(
+                      context,
+                      ref,
+                      dashboardData.property,
+                      contractId: dashboardData.contractId,
+                      contractStatus: dashboardData.contractStatus,
+                      contractSignedByTenant:
+                          dashboardData.contractSignedByTenant,
+                      contractSignedByLandlord:
+                          dashboardData.contractSignedByLandlord,
+                    ),
                     const SizedBox(height: 24),
 
                     // Graphique des paiements
@@ -243,6 +253,10 @@ class HomeScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Property property,
+    {required String contractId,
+    required String contractStatus,
+    required bool contractSignedByTenant,
+    required bool contractSignedByLandlord,}
   ) {
     if (property.id.isEmpty) {
       return Card(
@@ -313,8 +327,6 @@ class HomeScreen extends ConsumerWidget {
             ],
             Row(
               children: [
-                const Icon(Icons.location_on, color: Color(AppColors.accent)),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${property.address}\n${property.postalCode} ${property.city}',
@@ -335,6 +347,48 @@ class HomeScreen extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Text(
+                'Statut contrat: ${_getContractStatusLabel(contractStatus, contractSignedByTenant, contractSignedByLandlord)}',
+                style: TextStyle(
+                  color: Colors.blue.shade800,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: contractStatus.toLowerCase() == 'active'
+                    ? () {
+                        ref
+                            .read(openPaymentSubmitIntentProvider.notifier)
+                            .state = PaymentSubmitIntent(
+                          open: true,
+                          contractId: contractId,
+                          propertyLabel: property.address,
+                          monthlyRent: property.monthlyRent,
+                        );
+                        ref.read(navigationIndexProvider.notifier).state = 2;
+                      }
+                    : null,
+                icon: const Icon(Icons.receipt_long),
+                label: Text(
+                  contractStatus.toLowerCase() == 'active'
+                      ? 'Payer et envoyer une preuve'
+                      : 'Paiement disponible apres validation du contrat',
+                ),
+              ),
             ),
             if (property.surface > 0 || property.rooms > 0) ...[
               const SizedBox(height: 8),
@@ -375,6 +429,34 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _getContractStatusLabel(
+    String contractStatus,
+    bool contractSignedByTenant,
+    bool contractSignedByLandlord,
+  ) {
+    final status = contractStatus.toLowerCase();
+    if (status == 'active') return 'Valide';
+    if (status == 'expired') return 'Expire';
+    if (status == 'terminated' || status == 'cancelled') {
+      return 'Rejete ou resilie';
+    }
+    if (status == 'draft' ||
+        status == 'pending' ||
+        status == 'signed' ||
+        status == 'requested' ||
+        status == 'submitted' ||
+        status == 'awaiting_approval' ||
+        status == 'under_review') {
+      if (contractSignedByTenant && !contractSignedByLandlord) {
+        return 'En attente de validation du bailleur';
+      }
+      if (!contractSignedByTenant) return 'Brouillon';
+      return 'En cours de traitement';
+    }
+    if (status.isEmpty) return 'Aucun contrat';
+    return status;
   }
 
   Widget _buildQuickActions(

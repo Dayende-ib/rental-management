@@ -191,6 +191,36 @@ class ApiClient {
     }
   }
 
+  /// DELETE request with authentication
+  Future<dynamic> delete(String endpoint, {bool requiresAuth = true}) async {
+    final url = Uri.parse('${AppConstants.baseUrl}$endpoint');
+    final headers = requiresAuth ? _authHeaders : <String, String>{};
+
+    try {
+      final response = await _client
+          .delete(url, headers: headers)
+          .timeout(Duration(seconds: AppConstants.apiTimeoutSeconds));
+      return await _handleResponse(response);
+    } on SocketException {
+      throw ApiException(
+        'Connexion internet indisponible. Verifiez votre reseau puis reessayez.',
+        0,
+      );
+    } on TimeoutException {
+      throw ApiException(
+        "Le serveur met trop de temps a repondre. Reessayez dans quelques instants.",
+        0,
+      );
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException(
+        "Une erreur reseau est survenue. Verifiez votre connexion puis reessayez.",
+        0,
+      );
+    }
+  }
+
   /// GET request returning a list with authentication support and retry
   Future<List<dynamic>> getList(
     String endpoint, {
@@ -393,6 +423,11 @@ String _extractErrorMessage(Map<String, dynamic> body, int statusCode) {
 String _localizeServerMessage(String rawMessage, int statusCode) {
   final lower = rawMessage.toLowerCase();
 
+  if (lower.contains('rls') ||
+      lower.contains('payments tenant insert') ||
+      lower.contains('policy')) {
+    return 'Creation de paiement bloquee par la policy de securite (RLS). Contactez l\'administrateur pour activer la policy tenant insert sur payments.';
+  }
   if (lower.contains('session') && lower.contains('expire')) {
     return 'Votre session a expire. Reconnectez-vous pour continuer.';
   }

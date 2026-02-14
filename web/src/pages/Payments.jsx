@@ -8,11 +8,13 @@ import {
   DollarSign,
   Filter,
   Search,
+  Trash2,
   XCircle,
 } from "lucide-react";
 
 import PaginationControls from "../components/PaginationControls";
 import api from "../services/api";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 
 export default function Payments() {
   const [payments, setPayments] = useState([]);
@@ -84,9 +86,53 @@ export default function Payments() {
     });
   }, [payments, searchTerm, filterStatus, filterValidation]);
 
+  const subscriptionAlerts = useMemo(() => {
+    const now = new Date();
+    return payments
+      .map((p) => {
+        const due = p?.due_date ? new Date(p.due_date) : null;
+        if (!due || Number.isNaN(due.getTime())) return null;
+        const ms = due.getTime() - now.getTime();
+        const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        const settled =
+          p.status === "paid" || p.validation_status === "validated";
+        if (settled) return null;
+        if (days <= 0) {
+          return { type: "urgent", days, payment: p };
+        }
+        if (days <= 10) {
+          return { type: "soon", days, payment: p };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.days - b.days);
+  }, [payments]);
+
   const totalAmount = filteredPayments
-    .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    .filter((p) => p.status === "paid" || p.validation_status === "validated")
+    .reduce(
+      (sum, p) => sum + (Number(p.amount_paid || 0) > 0 ? Number(p.amount_paid || 0) : Number(p.amount || 0)),
+      0
+    );
+
+  const deletePayment = async (payment) => {
+    const confirmed = window.confirm(
+      "Supprimer ce paiement ? Cette action est irreversible."
+    );
+    if (!confirmed) return;
+    try {
+      await api.delete(`/payments/${payment.id}`);
+      fetchPayments(page);
+    } catch (err) {
+      console.error(err);
+      alert("Suppression impossible");
+    }
+  };
+
+  useRealtimeRefresh(() => {
+    fetchPayments(page);
+  }, ["payments", "contracts"]);
 
   const openDecisionModal = (mode, payment) => {
     setDecisionModal({ open: true, mode, payment });
@@ -136,6 +182,39 @@ export default function Payments() {
           <p className="text-gray-500">Gestion des preuves et validation des paiements</p>
         </div>
       </div>
+
+      {subscriptionAlerts.length > 0 && (
+        <div className="p-4 bg-white border border-red-100 shadow-sm rounded-2xl">
+          <h3 className="text-base font-bold text-gray-900">
+            Alertes fin d&apos;abonnement ({subscriptionAlerts.length})
+          </h3>
+          <div className="mt-3 space-y-2">
+            {subscriptionAlerts.slice(0, 6).map((a, idx) => (
+              <div
+                key={`${a.payment.id}-${idx}`}
+                className={`p-3 rounded-xl border ${
+                  a.type === "urgent"
+                    ? "bg-red-50 border-red-200 text-red-800"
+                    : "bg-orange-50 border-orange-200 text-orange-800"
+                }`}
+              >
+                <p className="text-sm font-semibold">
+                  {a.payment.contracts?.properties?.title ||
+                    a.payment.contracts?.properties?.address ||
+                    "Bien"}
+                </p>
+                <p className="text-xs">
+                  {a.type === "urgent"
+                    ? `Abonnement expire depuis ${Math.abs(a.days)} jour(s)`
+                    : `Abonnement se termine dans ${a.days} jour(s)`}
+                  {" - "}
+                  Contrat {String(a.payment.contract_id || "").slice(0, 8)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="p-6 bg-white border border-gray-100 shadow-md rounded-3xl md:col-span-1">
@@ -221,6 +300,7 @@ export default function Payments() {
               userRole={userRole}
               onValidate={() => openDecisionModal("validate", payment)}
               onReject={() => openDecisionModal("reject", payment)}
+              onDelete={() => deletePayment(payment)}
             />
           ))}
         </div>
@@ -298,10 +378,10 @@ export default function Payments() {
   );
 }
 
-function PaymentCard({ payment, userRole, onValidate, onReject }) {
+function PaymentCard({ payment, userRole, onValidate, onReject, onDelete }) {
+  const canManagePayments = userRole === "manager";
   const canReview =
-    (userRole === "admin" || userRole === "manager") &&
-    payment.validation_status === "pending";
+    canManagePayments && payment.validation_status === "pending";
 
   return (
     <div className="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-md group rounded-3xl hover:shadow-xl">
@@ -326,9 +406,29 @@ function PaymentCard({ payment, userRole, onValidate, onReject }) {
 
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2 text-gray-700">
-            <Calendar className="w-4 h-4 text-[#1C9B7E]" />
-            Echeance: {formatDate(payment.due_date)}
+            <CreditCard className="w-4 h-4 text-[#1C9B7E]" />
+            Bien: {payment.contracts?.properties?.title || payment.contracts?.properties?.address || "-"}
           </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <Clock className="w-4 h-4 text-[#1C9B7E]" />
+            Contrat: {String(payment.contract_id || payment.contracts?.id || "-").slice(0, 8)}
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <Calendar className="w-4 h-4 text-[#1C9B7E]" />
+            Fin abonnement: {formatDate(payment.due_date)}
+          </div>
+          {Number(payment.amount_paid || 0) > 0 && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <DollarSign className="w-4 h-4 text-[#1C9B7E]" />
+              Somme versee: {Number(payment.amount_paid || 0).toLocaleString()} FCFA
+            </div>
+          )}
+          {payment.payment_method && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <CreditCard className="w-4 h-4 text-[#1C9B7E]" />
+              Moyen: {formatPaymentMethod(payment.payment_method, payment.validation_notes)}
+            </div>
+          )}
           {payment.payment_date && (
             <div className="flex items-center gap-2 text-gray-700">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -422,6 +522,20 @@ function PaymentCard({ payment, userRole, onValidate, onReject }) {
             </button>
           </div>
         )}
+        {canManagePayments &&
+          payment.validation_status !== "validated" &&
+          payment.status !== "paid" && (
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onDelete}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
+              >
+                <Trash2 className="w-3 h-3" />
+                Supprimer
+              </button>
+            </div>
+          )}
       </div>
     </div>
   );
@@ -494,4 +608,16 @@ function isLikelyImageUrl(url) {
     lower.includes(".jpeg") ||
     lower.includes(".webp")
   );
+}
+
+function formatPaymentMethod(method, notes) {
+  const n = String(notes || "").toLowerCase();
+  if (n.includes("moyen saisi: mobile_money") || n.includes("moyen: mobile_money")) {
+    return "Mobile money";
+  }
+  const m = String(method || "").toLowerCase();
+  if (m === "bank_transfer") return "Virement bancaire";
+  if (m === "mobile_money") return "Mobile money";
+  if (m === "card") return "Carte";
+  return method || "-";
 }

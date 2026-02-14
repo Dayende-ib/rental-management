@@ -47,12 +47,16 @@ export default function ImprovedRegister() {
 
     try {
       console.log("Inscription en cours...");
-      const res = await api.post("/auth/register", formData);
-      console.log("Reponse API:", res.data);
+      const res = await api.post("/auth/register", {
+        ...formData,
+        role: "manager",
+      });
+      const payload = res?.data && typeof res.data === "object" ? res.data : (res || {});
+      console.log("Reponse API:", payload);
 
-      if (res.data.session?.access_token) {
-        localStorage.setItem("token", res.data.session.access_token);
-        localStorage.setItem("user", JSON.stringify(res.data.user || {}));
+      if (payload.session?.access_token) {
+        localStorage.setItem("token", payload.session.access_token);
+        localStorage.setItem("user", JSON.stringify(payload.user || {}));
         console.log("Navigation vers dashboard...");
         navigate("/dashboard");
       } else {
@@ -61,10 +65,19 @@ export default function ImprovedRegister() {
       }
     } catch (err) {
       console.error("Erreur Inscription:", err);
-      setError(
-        err.response?.data?.error ||
-        "Echec de l'inscription. Veuillez reessayer."
-      );
+      const raw = err?.response?.data?.error ?? err?.response?.data?.message ?? err?.message;
+      if (typeof raw === "string" && raw.trim()) {
+        setError(raw);
+      } else if (raw && typeof raw === "object") {
+        setError(
+          raw.message ||
+          raw.error_description ||
+          raw.description ||
+          "Echec de l'inscription. Veuillez reessayer."
+        );
+      } else {
+        setError("Echec de l'inscription. Veuillez reessayer.");
+      }
     } finally {
       setLoading(false);
     }
@@ -194,7 +207,7 @@ export default function ImprovedRegister() {
                 Creer un compte
               </h2>
               <p className="text-lg text-gray-500">
-                Inscription reservee aux bailleurs
+                Creez votre acces bailleur
               </p>
             </div>
 
@@ -338,8 +351,6 @@ export default function ImprovedRegister() {
                     </div>
                   )}
                 </div>
-
-                <input type="hidden" name="role" value="manager" />
 
                 {/* Terms checkbox */}
                 <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">

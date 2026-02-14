@@ -274,18 +274,6 @@ export default function ImprovedLogin() {
                   </div>
                 </div>
 
-                {/* Remember me checkbox */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="remember"
-                    className="w-4 h-4 text-[#1C9B7E] border-gray-300 rounded focus:ring-[#1C9B7E] focus:ring-2"
-                  />
-                  <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
-                    Se souvenir de moi
-                  </label>
-                </div>
-
                 {/* Submit button */}
                 <button
                   type="submit"

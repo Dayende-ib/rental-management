@@ -4,6 +4,7 @@ import '../core/storage.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
 import '../core/database/database_helper.dart';
+import '../core/services/realtime_sync_service.dart';
 
 /// Authentication service handling login, logout, and user session
 class AuthService {
@@ -104,6 +105,7 @@ class AuthService {
     try {
       await _apiClient.post(AppConstants.logoutEndpoint);
     } catch (_) {}
+    await RealtimeSyncService.instance.stop();
     await DatabaseHelper.instance.clearAll();
     await StorageService.removeToken();
     await StorageService.removeUserId();

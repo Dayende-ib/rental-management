@@ -97,7 +97,7 @@ class PaymentHistoryChart extends StatelessWidget {
                   x: index,
                   barRods: [
                     BarChartRodData(
-                      toY: payment.amount,
+                      toY: payment.amountPaid > 0 ? payment.amountPaid : payment.amount,
                       color: payment.isPaid
                           ? const Color(AppColors.accent)
                           : Colors.orange,
@@ -128,7 +128,9 @@ class PaymentHistoryChart extends StatelessWidget {
 
   double _getMaxAmount(List<Payment> payments) {
     if (payments.isEmpty) return 100;
-    return payments.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
+    return payments
+        .map((p) => p.amountPaid > 0 ? p.amountPaid : p.amount)
+        .reduce((a, b) => a > b ? a : b);
   }
 
   Widget _buildLegendItem(String label, Color color) {

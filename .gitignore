@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 
+backend1/
+
 # Node
 node_modules/
 npm-debug.log*

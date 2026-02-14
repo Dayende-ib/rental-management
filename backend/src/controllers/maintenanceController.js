@@ -33,7 +33,9 @@ const { parsePagination, parseSort, buildListResponse } = require('../utils/list
 const getMaintenanceRequests = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
-        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const isAdmin = req.user?.role === 'admin';
+        const isManager = req.user?.role === 'manager';
+        const isBackoffice = isAdmin || isManager;
         const pagination = parsePagination(req.query);
         const { sortBy, sortOrder } = parseSort(
             req.query,
@@ -41,11 +43,15 @@ const getMaintenanceRequests = async (req, res, next) => {
             'created_at'
         );
         let tenantIdForList = null;
+        let propertyIdsForManager = null;
 
         const applyFilters = (query) => {
             let next = query;
             if (!isBackoffice) {
                 next = next.eq('tenant_id', tenantIdForList);
+            }
+            if (isManager) {
+                next = next.in('property_id', propertyIdsForManager);
             }
             return next;
         };
@@ -56,6 +62,18 @@ const getMaintenanceRequests = async (req, res, next) => {
                 return res.status(404).json({ error: 'Tenant profile not found' });
             }
             tenantIdForList = tenant.id;
+        } else if (isManager) {
+            const { data: properties, error: propertiesError } = await userClient
+                .from('properties')
+                .select('id')
+                .eq('owner_id', req.user.id);
+            if (propertiesError) throw propertiesError;
+            propertyIdsForManager = (properties || [])
+                .map((p) => String(p.id || '').trim())
+                .filter(Boolean);
+            if (!propertyIdsForManager.length) {
+                return res.status(200).json(buildListResponse([], pagination, 0));
+            }
         }
 
         let query = applyFilters(
@@ -90,7 +108,9 @@ const getMaintenanceRequests = async (req, res, next) => {
 const createMaintenanceRequest = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
-        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const isAdmin = req.user?.role === 'admin';
+        const isManager = req.user?.role === 'manager';
+        const isBackoffice = isAdmin || isManager;
         let payload = req.body || {};
 
         if (!isBackoffice) {
@@ -111,6 +131,17 @@ const createMaintenanceRequest = async (req, res, next) => {
                 photos: Array.isArray(payload.photos) ? payload.photos : [],
             };
         } else {
+            if (isManager) {
+                const { data: property, error: propertyError } = await userClient
+                    .from('properties')
+                    .select('id, owner_id')
+                    .eq('id', payload.property_id)
+                    .maybeSingle();
+                if (propertyError) throw propertyError;
+                if (!property || property.owner_id !== req.user.id) {
+                    return res.status(403).json({ error: 'Forbidden' });
+                }
+            }
             payload = {
                 ...payload,
                 title: String(payload.title || payload.description || 'Maintenance request').slice(0, 120),
@@ -133,7 +164,9 @@ const updateMaintenanceRequest = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userClient = createUserClient(req.token);
-        const isBackoffice = ['admin', 'manager'].includes(req.user?.role);
+        const isAdmin = req.user?.role === 'admin';
+        const isManager = req.user?.role === 'manager';
+        const isBackoffice = isAdmin || isManager;
 
         let payload = req.body || {};
 
@@ -161,6 +194,24 @@ const updateMaintenanceRequest = async (req, res, next) => {
                 status: payload.status || 'cancelled',
                 notes: payload.notes,
             };
+        } else if (isManager) {
+            const { data: ownReq, error: ownReqError } = await userClient
+                .from('maintenance_requests')
+                .select('id, property_id')
+                .eq('id', id)
+                .maybeSingle();
+            if (ownReqError) throw ownReqError;
+            if (!ownReq) return res.status(404).json({ error: 'Maintenance request not found' });
+
+            const { data: property, error: propertyError } = await userClient
+                .from('properties')
+                .select('id, owner_id')
+                .eq('id', ownReq.property_id)
+                .maybeSingle();
+            if (propertyError) throw propertyError;
+            if (!property || property.owner_id !== req.user.id) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
         }
 
         const { data, error } = await userClient

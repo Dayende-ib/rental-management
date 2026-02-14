@@ -36,6 +36,11 @@ class DashboardService {
       return DashboardData(
         tenant: tenant,
         property: property,
+        contractId: (contract?['id'] ?? '').toString(),
+        contractStatus: (contract?['status'] ?? '').toString(),
+        contractSignedByTenant: (contract?['signed_by_tenant'] ?? false) == true,
+        contractSignedByLandlord:
+            (contract?['signed_by_landlord'] ?? false) == true,
         upcomingPayments: payments,
         pendingMaintenanceRequests: pendingMaintenanceRequests,
       );
@@ -78,14 +83,48 @@ class DashboardService {
     List<dynamic> contracts,
     String tenantId,
   ) {
+    final matched = <Map<String, dynamic>>[];
     for (final item in contracts) {
-      if (item is Map<String, dynamic>) {
-        if (item['tenant_id']?.toString() == tenantId) {
-          return item;
-        }
+      if (item is Map<String, dynamic> &&
+          item['tenant_id']?.toString() == tenantId) {
+        matched.add(item);
       }
     }
-    return null;
+    if (matched.isEmpty) return null;
+    matched.sort((a, b) {
+      final pa = _contractStatusPriority(a['status']);
+      final pb = _contractStatusPriority(b['status']);
+      if (pa != pb) return pa.compareTo(pb);
+      final da = _parseDateValue(a['updated_at'] ?? a['created_at']);
+      final db = _parseDateValue(b['updated_at'] ?? b['created_at']);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return db.compareTo(da);
+    });
+    return matched.first;
+  }
+
+  int _contractStatusPriority(dynamic value) {
+    final status = value?.toString().toLowerCase() ?? '';
+    switch (status) {
+      case 'active':
+        return 0;
+      case 'draft':
+      case 'pending':
+      case 'signed':
+      case 'requested':
+      case 'submitted':
+      case 'awaiting_approval':
+      case 'under_review':
+        return 1;
+      case 'terminated':
+      case 'cancelled':
+      case 'expired':
+        return 3;
+      default:
+        return 2;
+    }
   }
 
   Future<Property> _fetchProperty(Map<String, dynamic>? contract) async {
@@ -105,12 +144,64 @@ class DashboardService {
 
       property ??= Property(
         id: propertyId,
-        title: (contract['properties']?['title'] ?? '').toString(),
-        address: (contract['properties']?['address'] ?? '').toString(),
-        city: '',
-        postalCode: '',
+        title: _stringOrEmpty(
+          contract['properties']?['title'] ?? contract['title'],
+        ),
+        address: _stringOrEmpty(
+          contract['properties']?['address'] ??
+              contract['properties']?['location'] ??
+              contract['address'] ??
+              contract['title'],
+        ),
+        city: _stringOrEmpty(
+          contract['properties']?['city'] ??
+              contract['properties']?['town'] ??
+              contract['properties']?['commune'] ??
+              contract['city'],
+        ),
+        postalCode: _stringOrEmpty(
+          contract['properties']?['postal_code'] ??
+              contract['properties']?['postalCode'] ??
+              contract['properties']?['zip_code'] ??
+              contract['postal_code'],
+        ),
         monthlyRent: 0,
       );
+      if (property.address.isEmpty ||
+          property.city.isEmpty ||
+          property.postalCode.isEmpty) {
+        final fallbackAddress = _stringOrEmpty(
+          contract['properties']?['address'] ??
+              contract['properties']?['location'] ??
+              contract['address'] ??
+              contract['title'],
+        );
+        final fallbackCity = _stringOrEmpty(
+          contract['properties']?['city'] ??
+              contract['properties']?['town'] ??
+              contract['properties']?['commune'] ??
+              contract['city'],
+        );
+        final fallbackPostal = _stringOrEmpty(
+          contract['properties']?['postal_code'] ??
+              contract['properties']?['postalCode'] ??
+              contract['properties']?['zip_code'] ??
+              contract['postal_code'],
+        );
+        property = Property(
+          id: property.id,
+          title: property.title,
+          address: property.address.isNotEmpty ? property.address : fallbackAddress,
+          city: property.city.isNotEmpty ? property.city : fallbackCity,
+          postalCode: property.postalCode.isNotEmpty
+              ? property.postalCode
+              : fallbackPostal,
+          monthlyRent: property.monthlyRent,
+          surface: property.surface,
+          rooms: property.rooms,
+          photos: property.photos,
+        );
+      }
       final rent = _toDouble(
         contract['monthly_rent'] ?? contract['monthlyRent'],
       );
@@ -179,5 +270,16 @@ class DashboardService {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0;
     return 0;
+  }
+
+  DateTime? _parseDateValue(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  String _stringOrEmpty(dynamic value) {
+    return value == null ? '' : value.toString().trim();
   }
 }

@@ -5,13 +5,13 @@ import 'storage.dart';
 class AppConstants {
   // API Configuration
   static const String _defaultAndroidBaseUrl =
-      'https://rental-management-production-e42c.up.railway.app/api';
+      'http://10.0.2.2:5000/api';
   static const String _defaultIosBaseUrl =
-      'https://rental-management-production-e42c.up.railway.app/api';
+      'http://localhost:5000/api';
   static const String _defaultWebBaseUrl =
-      'https://rental-management-production-e42c.up.railway.app/api';
+      'http://localhost:5000/api';
   static const String _defaultOtherBaseUrl =
-      'https://rental-management-production-e42c.up.railway.app/api';
+      'http://localhost:5000/api';
 
   static String get baseUrl {
     // Check local storage first (manual override)
@@ -25,15 +25,15 @@ class AppConstants {
       return envBaseUrl;
     }
     if (kIsWeb) {
-      return _defaultWebBaseUrl;
+      return kDebugMode ? _defaultWebBaseUrl : 'https://rental-management-production-e42c.up.railway.app/api';
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return _defaultAndroidBaseUrl;
+        return kDebugMode ? _defaultAndroidBaseUrl : 'https://rental-management-production-e42c.up.railway.app/api';
       case TargetPlatform.iOS:
-        return _defaultIosBaseUrl;
+        return kDebugMode ? _defaultIosBaseUrl : 'https://rental-management-production-e42c.up.railway.app/api';
       default:
-        return _defaultOtherBaseUrl;
+        return kDebugMode ? _defaultOtherBaseUrl : 'https://rental-management-production-e42c.up.railway.app/api';
     }
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import api from "../services/api";
 import PaginationControls from "../components/PaginationControls";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 import {
   Home,
   Plus,
@@ -16,10 +17,25 @@ import {
   Calendar,
   Upload,
   X,
+  FileText,
   Image as ImageIcon,
   Edit2,
   Trash2,
 } from "lucide-react";
+
+const normalizeRole = (value) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "admin" || raw === "administrateur") return "admin";
+  if (
+    raw === "manager" ||
+    raw === "gestionnaire" ||
+    raw === "bailleur" ||
+    raw === "landlord" ||
+    raw === "owner" ||
+    raw === "proprietaire"
+  ) return "manager";
+  return raw;
+};
 
 export default function Properties() {
   const [properties, setProperties] = useState([]);
@@ -36,10 +52,13 @@ export default function Properties() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [contractTemplateFile, setContractTemplateFile] = useState(null);
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [userRole, setUserRole] = useState("");
   const [ownerMap, setOwnerMap] = useState({});
   const formRef = useRef(null);
+  const normalizedRole = normalizeRole(userRole);
+  const canManageProperty = normalizedRole === "manager";
 
   const [formData, setFormData] = useState({
     title: "",
@@ -90,6 +109,7 @@ export default function Properties() {
       year_built: "",
     });
     setPhotoPreviews([]);
+    setContractTemplateFile(null);
   };
 
   const normalizePropertyPayload = (data) => {
@@ -176,6 +196,11 @@ export default function Properties() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
+      if (!editingPropertyId && !contractTemplateFile) {
+        alert("Le modele de contrat PDF est obligatoire a la creation d'un bien.");
+        return;
+      }
+
       const payload = normalizePropertyPayload(formData);
       delete payload.photos;
 
@@ -196,6 +221,14 @@ export default function Properties() {
             headers: { "Content-Type": "multipart/form-data" },
           });
         }
+      }
+
+      if (propertyId && contractTemplateFile) {
+        const templateData = new FormData();
+        templateData.append("file", contractTemplateFile);
+        await api.post(`/properties/${propertyId}/contract-template`, templateData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
 
       resetForm();
@@ -221,13 +254,22 @@ export default function Properties() {
     fetchProperties(page);
   }, [page, fetchProperties]);
 
+  useRealtimeRefresh(() => {
+    fetchProperties(page);
+  }, ["properties", "contracts"]);
+
   useEffect(() => {
     const fetchRole = async () => {
       try {
+        const localUser = JSON.parse(localStorage.getItem("user") || "{}");
+        if (localUser?.role) {
+          setUserRole(normalizeRole(localUser.role));
+        }
         const res = await api.get("/auth/profile");
-        setUserRole(res.data?.role || "");
+        setUserRole(normalizeRole(res.data?.role || ""));
       } catch {
-        setUserRole("");
+        const localUser = JSON.parse(localStorage.getItem("user") || "{}");
+        setUserRole(normalizeRole(localUser?.role || ""));
       }
     };
     fetchRole();
@@ -235,7 +277,7 @@ export default function Properties() {
 
   useEffect(() => {
     const fetchOwners = async () => {
-      if (userRole !== "admin") {
+      if (normalizedRole !== "admin") {
         setOwnerMap({});
         return;
       }
@@ -252,7 +294,7 @@ export default function Properties() {
       }
     };
     fetchOwners();
-  }, [userRole]);
+  }, [normalizedRole]);
 
   useEffect(() => {
     if (showForm) {
@@ -263,6 +305,7 @@ export default function Properties() {
   }, [showForm]);
 
   const handleEdit = (property) => {
+    if (!canManageProperty) return;
     setFormData({
       title: property.title || "",
       description: property.description || "",
@@ -309,6 +352,21 @@ export default function Properties() {
           "Erreur lors de la suppression de la propriete"
         )
       );
+    }
+  };
+
+  const handleOpenContractTemplate = async (propertyId) => {
+    try {
+      const res = await api.get(`/properties/${propertyId}/contract-template`);
+      const url = res?.data?.download_url;
+      if (!url) {
+        alert("Aucun contrat PDF disponible pour ce bien.");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error(err);
+      alert(getErrorMessage(err, "Impossible d'ouvrir le contrat PDF"));
     }
   };
 
@@ -387,6 +445,15 @@ export default function Properties() {
               {property.photos.length} PHOTOS
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => handleDelete(property.id)}
+            className="absolute top-4 left-4 z-20 p-2.5 text-red-700 bg-red-100 border border-red-200 rounded-2xl shadow-lg hover:bg-red-200"
+            aria-label="Supprimer"
+            title="Supprimer"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
           <div className="absolute top-4 right-4 z-20">
             {getStatusBadge(property.status)}
           </div>
@@ -394,6 +461,15 @@ export default function Properties() {
       ) : (
         <div className="relative flex items-center justify-center h-56 bg-slate-50">
           <ImageIcon className="w-16 h-16 text-slate-200" />
+          <button
+            type="button"
+            onClick={() => handleDelete(property.id)}
+            className="absolute top-4 left-4 z-20 p-2.5 text-red-700 bg-red-100 border border-red-200 rounded-2xl shadow-lg hover:bg-red-200"
+            aria-label="Supprimer"
+            title="Supprimer"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
           <div className="absolute top-4 right-4 z-20">
             {getStatusBadge(property.status)}
           </div>
@@ -416,7 +492,7 @@ export default function Properties() {
                 {property.energy_rating && <div className="w-1 h-1 rounded-full bg-slate-300" />}
                 {getEnergyRatingBadge(property.energy_rating)}
               </div>
-              {userRole === "admin" && (
+              {normalizedRole === "admin" && (
                 <p className="mt-1 text-xs text-slate-500">
                   Bailleur:{" "}
                   <span className="font-bold text-slate-700">
@@ -426,20 +502,32 @@ export default function Properties() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => handleEdit(property)}
-              className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-emerald-600 hover:bg-emerald-50"
-              aria-label="Modifier"
+              onClick={() => handleOpenContractTemplate(property.id)}
+              className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-blue-600 hover:bg-blue-50"
+              aria-label="Lire le contrat"
+              title="Lire le contrat"
             >
-              <Edit2 className="w-4 h-4" />
+              <FileText className="w-4 h-4" />
             </button>
+            {canManageProperty && (
+              <button
+                type="button"
+                onClick={() => handleEdit(property)}
+                className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-emerald-600 hover:bg-emerald-50"
+                aria-label="Modifier"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleDelete(property.id)}
-              className="p-2.5 text-slate-400 transition-all rounded-2xl hover:text-red-600 hover:bg-red-50"
+              className="p-2.5 text-red-600 transition-all rounded-2xl bg-red-50 hover:bg-red-100"
               aria-label="Supprimer"
+              title="Supprimer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -459,20 +547,59 @@ export default function Properties() {
           </div>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[
-            { icon: Bed, label: 'Beds', val: property.bedrooms },
-            { icon: Bath, label: 'Baths', val: property.bathrooms },
-            { icon: Square, label: 'm²', val: property.surface ?? property.surface_area }
-          ].map((feat, i) => (
-            <div key={i} className="flex flex-col items-center p-3 border border-slate-100 rounded-2xl">
-              <feat.icon className="w-4 h-4 text-slate-400 mb-1.5" />
-              <span className="text-sm font-black text-slate-900">{feat.val ?? '-'}</span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{feat.label}</span>
+        {property.description && String(property.description).trim() !== "" && (
+          <div className="mb-6 p-4 bg-slate-50 rounded-2xl">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">
+              Description
+            </p>
+            <p className="text-sm font-medium text-slate-700 line-clamp-3">
+              {property.description}
+            </p>
+          </div>
+        )}
+
+        {/* Property details: show only fields actually filled */}
+        {(() => {
+          const details = [
+            {
+              icon: Square,
+              label: "Surface",
+              val: property.surface ?? property.surface_area,
+              suffix: "m2",
+            },
+            { icon: Layers, label: "Pieces", val: property.rooms },
+            { icon: Bed, label: "Chambres", val: property.bedrooms },
+            { icon: Bath, label: "Salles d'eau", val: property.bathrooms },
+            { icon: Building, label: "Etage", val: property.floor },
+            { icon: Calendar, label: "Annee", val: property.year_built },
+          ].filter((item) => {
+            if (item.val === null || item.val === undefined) return false;
+            if (typeof item.val === "number") return item.val > 0;
+            return String(item.val).trim() !== "";
+          });
+
+          if (!details.length) return null;
+
+          return (
+            <div className="grid grid-cols-2 gap-3 mb-8">
+              {details.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-2 p-3 border border-slate-100 rounded-2xl"
+                >
+                  <item.icon className="w-4 h-4 text-slate-400" />
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    {item.label}
+                  </span>
+                  <span className="ml-auto text-sm font-black text-slate-900">
+                    {item.val}
+                    {item.suffix ? ` ${item.suffix}` : ""}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
 
         {/* Price */}
         <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
@@ -509,7 +636,7 @@ export default function Properties() {
           <p className="font-medium text-slate-400">Gérez votre parc immobilier et optimisez vos revenus</p>
         </div>
 
-        {!showForm && (
+        {!showForm && canManageProperty && (
           <button
             onClick={() => {
               resetForm();
@@ -569,7 +696,7 @@ export default function Properties() {
       </div>
 
       {/* Add Property Form */}
-      {showForm && (
+      {showForm && canManageProperty && (
         <div ref={formRef} className="p-8 bg-white border border-slate-200 shadow-2xl rounded-[2.5rem] animate-fadeIn">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">
@@ -635,6 +762,22 @@ export default function Properties() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">
+                  Modele de contrat (PDF) *
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  required={!editingPropertyId}
+                  onChange={(e) => setContractTemplateFile(e.target.files?.[0] || null)}
+                  className="w-full px-6 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none font-bold text-slate-900"
+                />
+                <p className="text-xs text-slate-500 font-bold">
+                  Ce PDF sera telecharge par le locataire lors de la demande de location.
+                </p>
               </div>
 
               <div className="space-y-2">

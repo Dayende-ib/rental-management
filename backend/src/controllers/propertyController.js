@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const supabaseAdmin = require('../config/supabaseAdmin');
 const createUserClient = require('../config/supabaseUser');
 const { parsePagination, parseSort, buildListResponse } = require('../utils/listQuery');
 const { resolveTenant } = require('../utils/tenantResolver');
@@ -84,6 +85,10 @@ const getProperties = async (req, res, next) => {
             }
         }
 
+        const includeUnavailableForTenant =
+            req.user?.role === 'tenant' &&
+            ['1', 'true', 'yes'].includes(String(req.query?.include_unavailable || '').toLowerCase());
+
         const applyFilters = (query) => {
             let next = query;
             if (isTenantMineScope) {
@@ -93,7 +98,7 @@ const getProperties = async (req, res, next) => {
                 } else {
                     next = next.in('id', tenantMinePropertyIds);
                 }
-            } else if (!isBackoffice) {
+            } else if (!isBackoffice && !includeUnavailableForTenant) {
                 next = next.eq('status', 'available');
             }
             if (isManager) {
@@ -125,7 +130,12 @@ const getProperties = async (req, res, next) => {
             total = count;
         }
 
-        res.status(200).json(buildListResponse(data || [], pagination, total));
+        const normalized = await markPropertiesWithActiveContract(
+            userClient,
+            data || [],
+            req.user?.role
+        );
+        res.status(200).json(buildListResponse(normalized, pagination, total));
     } catch (err) {
         next(err);
     }
@@ -143,7 +153,10 @@ const getPropertyById = async (req, res, next) => {
             .select('*')
             .eq('id', id);
 
-        if (!isBackoffice) {
+        const includeUnavailableForTenant =
+            req.user?.role === 'tenant' &&
+            ['1', 'true', 'yes'].includes(String(req.query?.include_unavailable || '').toLowerCase());
+        if (!isBackoffice && !includeUnavailableForTenant) {
             query = query.eq('status', 'available');
         }
         if (isManager) {
@@ -154,7 +167,12 @@ const getPropertyById = async (req, res, next) => {
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Property not found' });
-        res.status(200).json(data);
+        const [normalized] = await markPropertiesWithActiveContract(
+            userClient,
+            [data],
+            req.user?.role
+        );
+        res.status(200).json(normalized || data);
     } catch (err) {
         next(err);
     }
@@ -163,16 +181,15 @@ const getPropertyById = async (req, res, next) => {
 const createProperty = async (req, res, next) => {
     try {
         const userClient = createUserClient(req.token);
-        const isAdmin = req.user?.role === 'admin';
         const isManager = req.user?.role === 'manager';
-        const payload = {
-            ...req.body,
-            owner_id: isAdmin ? (req.body?.owner_id || req.user.id) : req.user.id,
-        };
 
-        if (!isAdmin && !isManager) {
+        if (!isManager) {
             return res.status(403).json({ error: 'Forbidden' });
         }
+        const payload = {
+            ...req.body,
+            owner_id: req.user.id,
+        };
 
         const { data, error } = await userClient
             .from('properties')
@@ -190,16 +207,13 @@ const updateProperty = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userClient = createUserClient(req.token);
-        const isAdmin = req.user?.role === 'admin';
         const isManager = req.user?.role === 'manager';
-        if (!isAdmin && !isManager) {
+        if (!isManager) {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
         const payload = { ...req.body };
-        if (isManager) {
-            delete payload.owner_id;
-        }
+        delete payload.owner_id;
 
         let query = userClient
             .from('properties')
@@ -260,9 +274,8 @@ const uploadPropertyPhoto = async (req, res, next) => {
         const mimeType = file.mimetype;
 
         const userClient = createUserClient(req.token);
-        const isAdmin = req.user?.role === 'admin';
         const isManager = req.user?.role === 'manager';
-        if (!isAdmin && !isManager) {
+        if (!isManager) {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
@@ -312,6 +325,160 @@ const uploadPropertyPhoto = async (req, res, next) => {
     }
 };
 
+const uploadPropertyContractTemplate = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const file = req.file;
+        const userClient = createUserClient(req.token);
+        const isManager = req.user?.role === 'manager';
+
+        if (!file) return res.status(400).json({ error: 'Missing file upload' });
+        if (!isManager) return res.status(403).json({ error: 'Forbidden' });
+
+        let propertyQuery = userClient
+            .from('properties')
+            .select('id, owner_id')
+            .eq('id', id);
+        if (isManager) {
+            propertyQuery = propertyQuery.eq('owner_id', req.user.id);
+        }
+        const { data: property, error: propertyError } = await propertyQuery.maybeSingle();
+        if (propertyError) throw propertyError;
+        if (!property) return res.status(404).json({ error: 'Property not found' });
+
+        const buffer = file.buffer;
+        const timestamp = Date.now();
+        const path = `properties/${id}/contract_template_${timestamp}.pdf`;
+        const bucket = 'documents';
+
+        const { error: uploadError } = await userClient.storage
+            .from(bucket)
+            .upload(path, buffer, { contentType: file.mimetype, upsert: true });
+        if (uploadError) throw uploadError;
+
+        const payload = {
+            entity_type: 'property',
+            entity_id: id,
+            document_type: 'lease_agreement',
+            file_name: file.originalname,
+            file_url: path,
+            mime_type: file.mimetype,
+            file_size: file.size,
+            uploaded_by: req.user?.id || null,
+        };
+
+        const { data, error } = await userClient
+            .from('documents')
+            .insert([payload])
+            .select()
+            .maybeSingle();
+        if (error) throw error;
+
+        return res.status(201).json(data);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const getPropertyContractTemplate = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const userClient = createUserClient(req.token);
+        const { data: row, error } = await userClient
+            .from('documents')
+            .select('id, file_url, file_name, mime_type, created_at')
+            .eq('entity_type', 'property')
+            .eq('entity_id', id)
+            .eq('document_type', 'lease_agreement')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        let fileUrl = row?.file_url || null;
+        let fileName = row?.file_name || 'contract.pdf';
+
+        // Fallback 1: signed document saved directly on a property's latest contract.
+        if (!fileUrl) {
+            const { data: contracts, error: contractsError } = await userClient
+                .from('contracts')
+                .select('id, status, contract_document_url, created_at')
+                .eq('property_id', id)
+                .order('created_at', { ascending: false })
+                .limit(50);
+            if (contractsError) throw contractsError;
+
+            const latestWithDoc = (contracts || []).find((c) => String(c?.contract_document_url || '').trim() !== '');
+            if (latestWithDoc?.contract_document_url) {
+                fileUrl = latestWithDoc.contract_document_url;
+                fileName = `contract_${latestWithDoc.id}.pdf`;
+            }
+
+            // Fallback 2: signed document saved in documents table at contract level.
+            if (!fileUrl) {
+                const contractIds = (contracts || [])
+                    .map((c) => String(c.id || '').trim())
+                    .filter(Boolean);
+
+                if (contractIds.length) {
+                    const { data: contractDoc, error: contractDocError } = await userClient
+                        .from('documents')
+                        .select('id, file_url, file_name, mime_type, document_type, created_at')
+                        .eq('entity_type', 'contract')
+                        .in('entity_id', contractIds)
+                        .order('created_at', { ascending: false })
+                        .limit(50);
+                    if (contractDocError) throw contractDocError;
+
+                    const preferred = (contractDoc || []).find((d) => {
+                        const docType = String(d?.document_type || '').toLowerCase();
+                        const mimeType = String(d?.mime_type || '').toLowerCase();
+                        const url = String(d?.file_url || '').toLowerCase();
+                        return docType === 'lease_agreement'
+                            || mimeType === 'application/pdf'
+                            || url.endsWith('.pdf');
+                    });
+
+                    const firstDoc = preferred || (contractDoc || [])[0];
+                    if (firstDoc?.file_url) {
+                        fileUrl = firstDoc.file_url;
+                        fileName = firstDoc.file_name || 'contract.pdf';
+                    }
+                }
+            }
+        }
+
+        if (!fileUrl) {
+            return res.status(404).json({ error: 'Contract template not found for this property' });
+        }
+
+        if (String(fileUrl || '').startsWith('http')) {
+            return res.status(200).json({
+                file_name: fileName,
+                download_url: fileUrl,
+            });
+        }
+
+        let signedData = null;
+        const userSign = await userClient.storage.from('documents').createSignedUrl(fileUrl, 60 * 30);
+        if (!userSign.error) {
+            signedData = userSign.data;
+        } else {
+            const adminSign = await supabaseAdmin.storage.from('documents').createSignedUrl(fileUrl, 60 * 30);
+            if (adminSign.error) throw adminSign.error;
+            signedData = adminSign.data;
+        }
+
+        return res.status(200).json({
+            file_name: fileName,
+            download_url: signedData?.signedUrl || null,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getProperties,
     getPropertyById,
@@ -319,4 +486,67 @@ module.exports = {
     updateProperty,
     deleteProperty,
     uploadPropertyPhoto,
+    uploadPropertyContractTemplate,
+    getPropertyContractTemplate,
 };
+
+async function markPropertiesWithActiveContract(userClient, properties, viewerRole) {
+    const rows = Array.isArray(properties) ? properties : [];
+    if (!rows.length) return rows;
+
+    const ids = Array.from(new Set(rows.map((p) => String(p?.id || '')).filter(Boolean)));
+    if (!ids.length) return rows;
+
+    const openStatuses = ['draft', 'pending', 'active', 'submitted', 'awaiting_approval', 'under_review', 'signed', 'requested'];
+
+    let contracts = null;
+    let error = null;
+
+    // Tenant/guest views must use global occupancy; user-scoped RLS can hide
+    // other tenants' contracts and make an occupied property appear available.
+    const preferAdmin = ['tenant', 'guest'].includes(String(viewerRole || '').toLowerCase());
+    const firstClient = preferAdmin ? supabaseAdmin : userClient;
+    const secondClient = preferAdmin ? userClient : supabaseAdmin;
+
+    const firstResult = await firstClient
+        .from('contracts')
+        .select('property_id, status')
+        .in('property_id', ids)
+        .in('status', openStatuses);
+    contracts = firstResult.data;
+    error = firstResult.error;
+
+    if (error) {
+        const secondResult = await secondClient
+            .from('contracts')
+            .select('property_id, status')
+            .in('property_id', ids)
+            .in('status', openStatuses);
+        contracts = secondResult.data;
+        error = secondResult.error;
+    }
+
+    if (error) throw error;
+
+    const activeIds = new Set((contracts || []).map((c) => String(c?.property_id || '')).filter(Boolean));
+    return rows.map((row) => {
+        if (!row || !activeIds.has(String(row.id || ''))) {
+            const normalizedStatus = String(row?.status || '').toLowerCase();
+            const nextStatus = normalizedStatus === 'rented' ? 'available' : row?.status;
+            return {
+                ...row,
+                status: nextStatus,
+                has_active_contract: false,
+                has_open_contract: false,
+                is_contractable: nextStatus === 'available',
+            };
+        }
+        return {
+            ...row,
+            status: 'rented',
+            has_active_contract: true,
+            has_open_contract: true,
+            is_contractable: false,
+        };
+    });
+}

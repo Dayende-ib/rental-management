@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Home, Users, CreditCard, TrendingUp, Plus, ArrowUpRight, Activity, AlertTriangle } from "lucide-react";
+import { Home, Users, CreditCard, TrendingUp, ArrowUpRight, Activity, AlertTriangle } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ export default function Dashboard() {
     tenants: 0,
     payments: 0,
     revenue: 0,
+    revenueCollectedMonth: 0,
+    revenueTheoreticalMonth: 0,
   });
   const [role, setRole] = useState("");
   const [ownerSummary, setOwnerSummary] = useState([]);
@@ -36,44 +39,86 @@ export default function Dashboard() {
   });
   const [paymentTrend, setPaymentTrend] = useState([]);
   const [statusBreakdown, setStatusBreakdown] = useState([]);
+  const [paymentValidationBreakdown, setPaymentValidationBreakdown] = useState([]);
   const [propertyTypeBreakdown, setPropertyTypeBreakdown] = useState([]);
+  const [propertyStatusBreakdown, setPropertyStatusBreakdown] = useState([]);
+  const [contractStatusBreakdown, setContractStatusBreakdown] = useState([]);
   const [maintenanceBreakdown, setMaintenanceBreakdown] = useState([]);
+  const [maintenanceTrend, setMaintenanceTrend] = useState([]);
+  const [topRentProperties, setTopRentProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const [occupancyRate, setOccupancyRate] = useState(0);
+
+  useRealtimeRefresh(() => {
+    setRefreshTick((v) => v + 1);
+  }, ["properties", "tenants", "payments", "contracts", "maintenance", "users", "notifications"]);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        const fetchAllPayments = async () => {
+          const limit = 200;
+          let page = 1;
+          let totalPages = 1;
+          const all = [];
+
+          while (page <= totalPages) {
+            const { items, meta } = await api.getList("/payments", {
+              params: { page, limit },
+            });
+            all.push(...(items || []));
+            totalPages = Number(meta?.total_pages || 1);
+            page += 1;
+          }
+
+          return all;
+        };
+
+        const toMoney = (value) => {
+          if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+          if (typeof value === "string") {
+            const normalized = value.replace(/\s/g, "").replace(",", ".");
+            const n = Number(normalized);
+            return Number.isFinite(n) ? n : 0;
+          }
+          return 0;
+        };
+
         const results = await Promise.allSettled([
           api.get("/auth/profile"),
           api.get("/properties"),
           api.get("/tenants"),
-          api.get("/payments"),
           api.get("/maintenance"),
+          api.get("/contracts"),
         ]);
 
         const profileRes = results[0].status === "fulfilled" ? results[0].value : null;
         const propertiesRes = results[1].status === "fulfilled" ? results[1].value : null;
         const tenantsRes = results[2].status === "fulfilled" ? results[2].value : null;
-        const paymentsRes = results[3].status === "fulfilled" ? results[3].value : null;
-        const maintenanceRes = results[4].status === "fulfilled" ? results[4].value : null;
+        const maintenanceRes = results[3].status === "fulfilled" ? results[3].value : null;
+        const contractsRes = results[4].status === "fulfilled" ? results[4].value : null;
+
+        const toItems = (payload) => {
+          if (Array.isArray(payload)) return payload;
+          if (payload && Array.isArray(payload.data)) return payload.data;
+          if (payload && Array.isArray(payload.items)) return payload.items;
+          return [];
+        };
 
         const currentRole = profileRes?.data?.role || "";
         setRole(currentRole);
 
-        const properties = Array.isArray(propertiesRes?.data) ? propertiesRes.data : [];
-        const tenants = Array.isArray(tenantsRes?.data) ? tenantsRes.data : [];
-        const payments = Array.isArray(paymentsRes?.data) ? paymentsRes.data : [];
-        const maintenance = Array.isArray(maintenanceRes?.data) ? maintenanceRes.data : [];
+        const properties = toItems(propertiesRes?.data);
+        const tenants = toItems(tenantsRes?.data);
+        const payments = await fetchAllPayments();
+        const maintenance = toItems(maintenanceRes?.data);
+        const contracts = toItems(contractsRes?.data);
 
         // Calcul de l'occupation
         const rentedCount = properties.filter(p => p.status === 'rented').length;
         setOccupancyRate(properties.length > 0 ? (rentedCount / properties.length) * 100 : 0);
-
-        const revenue = payments
-          .filter((p) => p.status === "paid")
-          .reduce((sum, p) => sum + (Number(p.amount_paid ?? p.amount ?? 0) || 0), 0);
 
         const overdue = payments.filter((p) => p.status === "overdue").length;
         const maintenanceOpen = maintenance.filter((m) =>
@@ -97,15 +142,57 @@ export default function Dashboard() {
         }
         const monthIndex = new Map(months.map((m, idx) => [m.key, idx]));
 
+        const revenueCollectedMonth = payments
+          .filter((p) => p.status === "paid" || p.validation_status === "validated")
+          .reduce((sum, p) => {
+            const paid = toMoney(p.amount_paid);
+            const fallback = toMoney(p.amount);
+            return sum + (paid > 0 ? paid : fallback);
+          }, 0);
+
+        const revenueTheoreticalMonth = contracts
+          .filter((c) => String(c.status || "").toLowerCase() === "active")
+          .reduce(
+            (sum, c) => sum + ((Number(c.monthly_rent || 0) || 0) + (Number(c.charges || 0) || 0)),
+            0
+          );
+
+        const resolvePaymentDate = (payment) => {
+          const candidates = [
+            payment?.payment_date,
+            payment?.validated_at,
+            payment?.updated_at,
+            payment?.created_at,
+            payment?.due_date,
+          ];
+          for (const raw of candidates) {
+            if (!raw) continue;
+            const d = new Date(raw);
+            if (!Number.isNaN(d.getTime())) return d;
+          }
+          const monthLabel = String(payment?.month || "");
+          const match = monthLabel.match(/(\d{4}-\d{2}-\d{2})/);
+          if (match?.[1]) {
+            const d = new Date(match[1]);
+            if (!Number.isNaN(d.getTime())) return d;
+          }
+          return null;
+        };
+
         payments.forEach((p) => {
-          const rawDate = p.payment_date || p.due_date;
-          if (!rawDate) return;
-          const d = new Date(rawDate);
-          if (Number.isNaN(d.getTime())) return;
+          const d = resolvePaymentDate(p);
+          if (!d) return;
           const key = buildMonthKey(d);
           if (!monthIndex.has(key)) return;
-          if (p.status !== "paid") return;
-          const amount = Number(p.amount_paid ?? p.amount ?? 0) || 0;
+          const isSettled =
+            String(p.status || "").toLowerCase() === "paid" ||
+            String(p.validation_status || "").toLowerCase() === "validated";
+          if (!isSettled) return;
+          const amount = (() => {
+            const paid = toMoney(p.amount_paid);
+            const fallback = toMoney(p.amount);
+            return paid > 0 ? paid : fallback;
+          })();
           months[monthIndex.get(key)].value += amount;
         });
 
@@ -119,6 +206,28 @@ export default function Dashboard() {
         const breakdown = statusLabels.map((s) => ({
           ...s,
           value: payments.filter((p) => p.status === s.key).length,
+        }));
+
+        const validationLabels = [
+          { key: "validated", label: "Valides" },
+          { key: "pending", label: "En attente" },
+          { key: "rejected", label: "Rejetes" },
+          { key: "not_submitted", label: "Non soumis" },
+        ];
+        const validationBreakdown = validationLabels.map((v) => ({
+          ...v,
+          value: payments.filter((p) => (p.validation_status || "") === v.key).length,
+        }));
+
+        const propertyStatusLabels = [
+          { key: "available", label: "Disponibles" },
+          { key: "rented", label: "Sous contrat" },
+          { key: "maintenance", label: "Maintenance" },
+          { key: "sold", label: "Vendus" },
+        ];
+        const propertyStatusData = propertyStatusLabels.map((s) => ({
+          ...s,
+          value: properties.filter((p) => (p.status || "") === s.key).length,
         }));
 
         const typeLabels = {
@@ -151,10 +260,46 @@ export default function Dashboard() {
           value: maintenance.filter((r) => r.status === m.key).length,
         }));
 
+        const contractStatusLabels = [
+          { key: "active", label: "Actifs" },
+          { key: "draft", label: "Brouillons" },
+          { key: "terminated", label: "Resilies" },
+          { key: "expired", label: "Expires" },
+        ];
+        const contractStatusData = contractStatusLabels.map((s) => ({
+          ...s,
+          value: contracts.filter((c) => (c.status || "") === s.key).length,
+        }));
+
+        const maintenanceMonths = months.map((m) => ({ ...m, value: 0 }));
+        const maintenanceMonthIndex = new Map(maintenanceMonths.map((m, idx) => [m.key, idx]));
+        maintenance.forEach((m) => {
+          const rawDate = m.created_at || m.updated_at;
+          if (!rawDate) return;
+          const d = new Date(rawDate);
+          if (Number.isNaN(d.getTime())) return;
+          const key = buildMonthKey(d);
+          if (!maintenanceMonthIndex.has(key)) return;
+          maintenanceMonths[maintenanceMonthIndex.get(key)].value += 1;
+        });
+
+        const topRents = [...properties]
+          .map((p) => ({
+            label: p.title || p.address || "Bien",
+            value: Number(p.price || 0) || 0,
+          }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 8);
+
         setPaymentTrend(months);
         setStatusBreakdown(breakdown);
+        setPaymentValidationBreakdown(validationBreakdown);
         setPropertyTypeBreakdown(typeBreakdown);
+        setPropertyStatusBreakdown(propertyStatusData);
+        setContractStatusBreakdown(contractStatusData);
         setMaintenanceBreakdown(maintenanceData);
+        setMaintenanceTrend(maintenanceMonths);
+        setTopRentProperties(topRents);
 
         if (currentRole === "admin") {
           let owners = {};
@@ -184,7 +329,9 @@ export default function Dashboard() {
           properties: properties.length,
           tenants: tenants.length,
           payments: payments.length,
-          revenue,
+          revenue: revenueCollectedMonth,
+          revenueCollectedMonth,
+          revenueTheoreticalMonth,
         });
         setAlerts({
           overdue,
@@ -197,7 +344,7 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, []);
+  }, [refreshTick]);
 
   const StatCard = ({ title, value, icon, link, gradient, subValue, delay }) => {
     const IconComponent = icon;
@@ -236,20 +383,6 @@ export default function Dashboard() {
           <div className={`h-full w-0 group-hover:w-full transition-all duration-1000 ease-out bg-gradient-to-r ${gradient}`} />
         </div>
       </div>
-    );
-  };
-
-  const QuickAction = ({ title, icon, onClick, color }) => {
-    const IconComponent = icon;
-    return (
-      <button
-        onClick={onClick}
-        className={`group relative overflow-hidden px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r ${color} hover:shadow-2xl hover:shadow-indigo-200 transition-all duration-500 flex items-center gap-3 active:scale-95`}
-      >
-        <IconComponent size={20} strokeWidth={2.5} />
-        <span>{title}</span>
-        <div className="absolute inset-0 transition-opacity bg-white opacity-0 group-hover:opacity-15" />
-      </button>
     );
   };
 
@@ -327,12 +460,12 @@ export default function Dashboard() {
             delay={200}
           />
           <StatCard
-            title="Revenus Mensuels"
-            value={`${stats.revenue.toLocaleString()} FCFA`}
+            title="Revenu Reel Encaisse"
+            value={`${stats.revenueCollectedMonth.toLocaleString()} FCFA`}
             icon={TrendingUp}
             link="/payments"
             gradient="from-orange-600 to-amber-500"
-            subValue="+12% vs last month"
+            subValue="Total paye/valide"
             delay={300}
           />
         </div>
@@ -533,35 +666,107 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-1 h-8 rounded-full bg-gradient-to-b from-blue-500 to-purple-500" />
-          <h2 className="text-2xl font-bold text-gray-900">
-            {role === "admin" ? "Actions rapides (Admin)" : "Actions rapides"}
-          </h2>
-        </div>
+      {!loading && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl lg:col-span-2">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-cyan-500 to-blue-500" />
+              <h2 className="text-xl font-bold text-gray-900">Etat des biens</h2>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={propertyStatusBreakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#06B6D4" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-        <div className="flex flex-wrap gap-4">
-          <QuickAction
-            title="Ajouter une propriete"
-            icon={Plus}
-            onClick={() => navigate("/properties")}
-            color="from-blue-600 to-blue-700"
-          />
-          <QuickAction
-            title="Ajouter un locataire"
-            icon={Plus}
-            onClick={() => navigate("/tenants")}
-            color="from-purple-600 to-purple-700"
-          />
-          <QuickAction
-            title="Enregistrer un paiement"
-            icon={Plus}
-            onClick={() => navigate("/payments")}
-            color="from-green-600 to-green-700"
-          />
+          <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-emerald-500 to-lime-500" />
+              <h2 className="text-xl font-bold text-gray-900">Validation paiements</h2>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={paymentValidationBreakdown}
+                  dataKey="value"
+                  nameKey="label"
+                  innerRadius={40}
+                  outerRadius={85}
+                  paddingAngle={2}
+                >
+                  {paymentValidationBreakdown.map((_, index) => (
+                    <Cell
+                      key={`validation-cell-${index}`}
+                      fill={["#16A34A", "#EAB308", "#EF4444", "#64748B"][index % 4]}
+                    />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" height={36} />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      )}
+
+      {!loading && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-fuchsia-500 to-purple-500" />
+              <h2 className="text-xl font-bold text-gray-900">Contrats par statut</h2>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={contractStatusBreakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#A855F7" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-amber-500 to-red-500" />
+              <h2 className="text-xl font-bold text-gray-900">Evolution maintenance (6 mois)</h2>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={maintenanceTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="#F97316" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {!loading && (
+        <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 rounded-full bg-gradient-to-b from-slate-500 to-slate-700" />
+            <h2 className="text-xl font-bold text-gray-900">Top loyers mensuels</h2>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={topRentProperties}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={70} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(value) => `${Number(value).toLocaleString()} FCFA`} />
+              <Bar dataKey="value" fill="#475569" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {

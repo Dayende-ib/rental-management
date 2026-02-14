@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
@@ -23,13 +23,53 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loadingCount, setLoadingCount] = useState(0);
+  const [rawNotificationCounts, setRawNotificationCounts] = useState({
+    contracts: 0,
+    payments: 0,
+    maintenance: 0,
+  });
+  const [dismissedCounts, setDismissedCounts] = useState({
+    contracts: 0,
+    payments: 0,
+    maintenance: 0,
+  });
+  const [notificationCounts, setNotificationCounts] = useState({
+    contracts: 0,
+    payments: 0,
+    maintenance: 0,
+  });
   const [user, setUser] = useState({
     full_name: "Loading...",
     email: "",
     role: "manager",
   });
   const navigate = useNavigate();
+  const location = useLocation();
   const profileRef = useRef();
+  const rawCountsRef = useRef(rawNotificationCounts);
+  const dismissedCountsRef = useRef(dismissedCounts);
+
+  const normalizeCounts = (counts) => ({
+    contracts: Number(counts?.contracts || 0),
+    payments: Number(counts?.payments || 0),
+    maintenance: Number(counts?.maintenance || 0),
+  });
+
+  const applyDismissed = (raw, dismissed) => {
+    const next = {};
+    for (const key of ["contracts", "payments", "maintenance"]) {
+      next[key] = Math.max(0, Number(raw?.[key] || 0) - Number(dismissed?.[key] || 0));
+    }
+    return next;
+  };
+
+  useEffect(() => {
+    rawCountsRef.current = rawNotificationCounts;
+  }, [rawNotificationCounts]);
+
+  useEffect(() => {
+    dismissedCountsRef.current = dismissedCounts;
+  }, [dismissedCounts]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -66,6 +106,198 @@ export default function MainLayout() {
     const unsubscribe = subscribeLoading((count) => setLoadingCount(count));
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return undefined;
+
+    const base = (() => {
+      const configured =
+        import.meta.env.VITE_API_BASE_URL ||
+        import.meta.env.VITE_API_URL ||
+        "/api";
+      return configured.replace(/\/+$/, "");
+    })();
+
+    const streamUrl = `${base}/web/realtime/stream?token=${encodeURIComponent(token)}`;
+    let source = null;
+
+    try {
+      source = new EventSource(streamUrl);
+      source.onmessage = (event) => {
+        if (!event?.data) return;
+        try {
+          const payload = JSON.parse(event.data);
+          window.dispatchEvent(new CustomEvent("app:realtime", { detail: payload }));
+        } catch {
+          // ignore malformed payload
+        }
+      };
+      source.onerror = () => {
+        // browser handles reconnection automatically for SSE
+      };
+    } catch (error) {
+      console.error("Realtime stream initialization failed:", error);
+    }
+
+    return () => {
+      if (source) source.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    const inferNotificationKey = (notification) => {
+      const relatedType = String(notification?.related_entity_type || "").toLowerCase();
+      if (relatedType === "contract") return "contracts";
+      if (relatedType === "payment") return "payments";
+      if (relatedType === "maintenance") return "maintenance";
+
+      const haystack = `${notification?.title || ""} ${notification?.message || ""}`.toLowerCase();
+      if (/(contract|contrat)/.test(haystack)) return "contracts";
+      if (/(payment|paiement|preuve|proof|facture)/.test(haystack)) return "payments";
+      if (/(maintenance|panne|reparation|incident)/.test(haystack)) return "maintenance";
+      return null;
+    };
+
+    const summarizeUnreadByModule = (rows) => {
+      const summary = { contracts: 0, payments: 0, maintenance: 0 };
+      for (const notification of rows || []) {
+        if (notification?.is_read) continue;
+        const key = inferNotificationKey(notification);
+        if (key) summary[key] += 1;
+      }
+      return summary;
+    };
+
+    let cancelled = false;
+
+    const extractItems = (payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (payload && typeof payload === "object" && Array.isArray(payload.data)) return payload.data;
+      return [];
+    };
+
+    const summarizePendingByModule = (contractsRows, paymentsRows, maintenanceRows) => {
+      const contractPendingStatuses = new Set([
+        "draft",
+        "pending",
+        "requested",
+        "submitted",
+        "awaiting_approval",
+        "under_review",
+      ]);
+      const paymentPendingStatuses = new Set(["pending", "overdue", "partial"]);
+      const paymentPendingValidation = new Set(["not_submitted", "pending", "rejected"]);
+      const maintenancePendingStatuses = new Set(["reported", "pending", "in_progress"]);
+
+      const contracts = (contractsRows || []).filter((row) => {
+        const status = String(row?.status || "").toLowerCase();
+        const signedByTenant = Boolean(row?.signed_by_tenant);
+        const signedByLandlord = Boolean(row?.signed_by_landlord);
+        return contractPendingStatuses.has(status) || (signedByTenant && !signedByLandlord);
+      }).length;
+
+      const payments = (paymentsRows || []).filter((row) => {
+        const status = String(row?.status || "").toLowerCase();
+        const validation = String(row?.validation_status || "").toLowerCase();
+        return paymentPendingStatuses.has(status) || paymentPendingValidation.has(validation);
+      }).length;
+
+      const maintenance = (maintenanceRows || []).filter((row) => {
+        const status = String(row?.status || "").toLowerCase();
+        return maintenancePendingStatuses.has(status);
+      }).length;
+
+      return { contracts, payments, maintenance };
+    };
+
+    const fetchPendingCountsFromModules = async () => {
+      const [contractsRes, paymentsRes, maintenanceRes] = await Promise.all([
+        api.get("/contracts"),
+        api.get("/payments"),
+        api.get("/maintenance"),
+      ]);
+      const contractsRows = extractItems(contractsRes?.data);
+      const paymentsRows = extractItems(paymentsRes?.data);
+      const maintenanceRows = extractItems(maintenanceRes?.data);
+      return summarizePendingByModule(contractsRows, paymentsRows, maintenanceRows);
+    };
+
+    const fetchNotificationCounts = async () => {
+      try {
+        const { items } = await api.getList("/notifications", {
+          params: { page: 1, limit: 200 },
+        });
+        const byNotifications = summarizeUnreadByModule(items || []);
+        const totalFromNotifications =
+          byNotifications.contracts + byNotifications.payments + byNotifications.maintenance;
+
+        // Fallback: if no usable notification data, compute from untreated records.
+        const nextCounts = totalFromNotifications > 0
+          ? byNotifications
+          : await fetchPendingCountsFromModules();
+
+        if (!cancelled) {
+          const normalized = normalizeCounts(nextCounts);
+          setRawNotificationCounts(normalized);
+          setNotificationCounts(
+            applyDismissed(normalized, dismissedCountsRef.current)
+          );
+        }
+      } catch (error) {
+        try {
+          const fallbackCounts = await fetchPendingCountsFromModules();
+          if (!cancelled) {
+            const normalized = normalizeCounts(fallbackCounts);
+            setRawNotificationCounts(normalized);
+            setNotificationCounts(
+              applyDismissed(normalized, dismissedCountsRef.current)
+            );
+          }
+        } catch (_fallbackError) {
+          if (!cancelled) {
+            const empty = { contracts: 0, payments: 0, maintenance: 0 };
+            setRawNotificationCounts(empty);
+            setNotificationCounts(empty);
+          }
+        }
+      }
+    };
+
+    fetchNotificationCounts();
+    const timer = setInterval(fetchNotificationCounts, 30000);
+    const realtimeHandler = () => {
+      fetchNotificationCounts();
+    };
+    window.addEventListener("app:realtime", realtimeHandler);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener("app:realtime", realtimeHandler);
+    };
+  }, [location.pathname, user.role]);
+
+  useEffect(() => {
+    const path = String(location.pathname || "").toLowerCase();
+    const routeToKey = [
+      { prefix: "/contracts", key: "contracts" },
+      { prefix: "/payments", key: "payments" },
+      { prefix: "/maintenance", key: "maintenance" },
+    ];
+    const match = routeToKey.find((r) => path.startsWith(r.prefix));
+    if (!match) return;
+
+    const moduleKey = match.key;
+    const baseline = Number(rawCountsRef.current?.[moduleKey] || 0);
+    const nextDismissed = {
+      ...dismissedCountsRef.current,
+      [moduleKey]: baseline,
+    };
+    dismissedCountsRef.current = nextDismissed;
+    setDismissedCounts(nextDismissed);
+    setNotificationCounts(applyDismissed(rawCountsRef.current, nextDismissed));
+  }, [location.pathname]);
 
   const theme = user.role === "admin"
     ? {
@@ -119,9 +351,9 @@ export default function MainLayout() {
     { name: "Tableau de bord", path: "/dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
     { name: "Propriétés", path: "/properties", icon: Home, roles: ["admin", "manager"] },
     { name: "Locataires", path: "/tenants", icon: Users, roles: ["admin", "manager"] },
-    { name: "Contrats", path: "/contracts", icon: FileText, roles: ["admin", "manager"] },
-    { name: "Paiements", path: "/payments", icon: CreditCard, roles: ["admin", "manager"] },
-    { name: "Maintenance", path: "/maintenance", icon: Wrench, roles: ["admin", "manager"] },
+    { name: "Contrats", path: "/contracts", icon: FileText, counterKey: "contracts", roles: ["admin", "manager"] },
+    { name: "Paiements", path: "/payments", icon: CreditCard, counterKey: "payments", roles: ["admin", "manager"] },
+    { name: "Maintenance", path: "/maintenance", icon: Wrench, counterKey: "maintenance", roles: ["admin", "manager"] },
     { name: "Utilisateurs", path: "/users", icon: UserCog, roles: ["admin"] },
   ];
 
@@ -183,11 +415,26 @@ export default function MainLayout() {
               >
                 {({ isActive }) => (
                   <>
-                    <item.icon
-                      size={22}
-                      className={isActive ? "text-white" : "text-slate-400 group-hover:text-slate-900"}
-                      strokeWidth={isActive ? 2.5 : 2}
-                    />
+                    <div className="relative">
+                      <item.icon
+                        size={22}
+                        className={isActive ? "text-white" : "text-slate-400 group-hover:text-slate-900"}
+                        strokeWidth={isActive ? 2.5 : 2}
+                      />
+                      {Number(notificationCounts[item.counterKey] || 0) > 0 && (
+                        <span
+                          className={`absolute -right-2 -top-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] leading-[18px] text-center font-bold ${
+                            isActive
+                              ? "bg-red-500 text-white"
+                              : "bg-red-100 text-red-700 border border-red-200"
+                          }`}
+                        >
+                          {notificationCounts[item.counterKey] > 99
+                            ? "99+"
+                            : notificationCounts[item.counterKey]}
+                        </span>
+                      )}
+                    </div>
                     {sidebarOpen && <span className="font-bold tracking-tight">{item.name}</span>}
                     {sidebarOpen && isActive && (
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto shadow-glow" />

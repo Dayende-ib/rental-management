@@ -1,23 +1,23 @@
 const supabase = require('../config/supabase');
 const supabaseAdmin = require('../config/supabaseAdmin');
 
-const authMiddleware = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
+const authSse = async (req, res, next) => {
+    const header = req.headers.authorization;
+    const queryToken = String(req.query?.token || '').trim();
+    const token = header && header.startsWith('Bearer ')
+        ? header.split(' ')[1]
+        : queryToken;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
         return res.status(401).json({ error: 'Unauthorized: No token provided' });
     }
 
-    const token = authHeader.split(' ')[1];
-
     try {
         const { data: { user }, error } = await supabase.auth.getUser(token);
-
         if (error || !user) {
             return res.status(401).json({ error: 'Unauthorized: Invalid token' });
         }
 
-        // Récupérer le profil pour avoir le rôle
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('role, full_name')
@@ -25,13 +25,13 @@ const authMiddleware = async (req, res, next) => {
             .maybeSingle();
 
         if (profileError) {
-            console.error('AuthMiddleware Profile Error:', profileError);
+            console.error('AuthSse Profile Error:', profileError);
         }
 
         req.user = {
             ...user,
             role: profile ? profile.role : 'tenant',
-            full_name: profile ? profile.full_name : null
+            full_name: profile ? profile.full_name : null,
         };
         req.token = token;
         next();
@@ -40,5 +40,5 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-module.exports = authMiddleware;
+module.exports = authSse;
 

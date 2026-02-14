@@ -9,6 +9,25 @@ final paymentServiceProvider = Provider<PaymentService>((ref) {
   return PaymentService();
 });
 
+class PaymentSubmitIntent {
+  final bool open;
+  final String contractId;
+  final String propertyLabel;
+  final double monthlyRent;
+
+  const PaymentSubmitIntent({
+    this.open = false,
+    this.contractId = '',
+    this.propertyLabel = '',
+    this.monthlyRent = 0,
+  });
+}
+
+/// Trigger to auto-open targeted payment form when user comes from "Payer" CTA.
+final openPaymentSubmitIntentProvider = StateProvider<PaymentSubmitIntent>(
+  (ref) => const PaymentSubmitIntent(),
+);
+
 /// Database helper provider
 final databaseHelperProvider = Provider<DatabaseHelper>((ref) {
   return DatabaseHelper.instance;
@@ -101,11 +120,11 @@ final paymentStatsProvider = Provider<PaymentStats>((ref) {
       final pending = payments.where((p) => p.isPendingValidation).length;
       final total = payments.fold<double>(
         0,
-        (sum, p) => sum + p.amount + p.lateFee,
+        (sum, p) => sum + (p.amountPaid > 0 ? p.amountPaid : p.amount) + p.lateFee,
       );
       final paid = payments.fold<double>(
         0,
-        (sum, p) => sum + (p.isPaid ? p.amount + p.lateFee : 0),
+        (sum, p) => sum + (p.isPaid ? (p.amountPaid > 0 ? p.amountPaid : p.amount) + p.lateFee : 0),
       );
 
       return PaymentStats(

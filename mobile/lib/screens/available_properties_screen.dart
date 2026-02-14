@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
+import '../core/services/realtime_sync_service.dart';
+import '../core/storage.dart';
+import 'payments_screen.dart';
 
 class AvailablePropertyItem {
   final Property property;
   final String status;
   final String type;
   final String description;
+  final String contractId;
+  final String contractStatus;
+  final bool contractSignedByTenant;
+  final bool contractSignedByLandlord;
+  final DateTime? contractEndDate;
 
   AvailablePropertyItem({
     required this.property,
     required this.status,
     required this.type,
     required this.description,
+    this.contractId = '',
+    this.contractStatus = '',
+    this.contractSignedByTenant = false,
+    this.contractSignedByLandlord = false,
+    this.contractEndDate,
   });
 
   bool get isAvailable => status.isEmpty || status == 'available';
@@ -33,6 +49,8 @@ class AvailablePropertiesScreen extends StatefulWidget {
 class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   final ApiClient _apiClient = ApiClient();
   late Future<List<AvailablePropertyItem>> _propertiesFuture;
+  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Timer? _refreshDebounce;
   PropertyViewMode _viewMode = PropertyViewMode.available;
   String _currentUserRole = '';
   String _currentUserId = '';
@@ -45,6 +63,27 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
     _propertiesFuture = _loadProperties();
     _initializeUserContext();
     _refreshCounts();
+    _realtimeSubscription = RealtimeSyncService.instance.stream.listen((event) {
+      final entity = event.entity.toLowerCase();
+      if (entity == 'properties' ||
+          entity == 'contracts' ||
+          entity == 'payments' ||
+          entity == 'maintenance' ||
+          entity == 'system') {
+        _refreshDebounce?.cancel();
+        _refreshDebounce = Timer(const Duration(milliseconds: 250), () {
+          if (!mounted) return;
+          _refresh();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshDebounce?.cancel();
+    _realtimeSubscription?.cancel();
+    super.dispose();
   }
 
   bool get _canUseOwnerView =>
@@ -64,30 +103,63 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
       });
       await _refreshCounts();
     } catch (_) {
-      // Ignore: guest context keeps default available view.
+      // Fallback: authenticated mobile app is tenant by design.
+      if (!mounted) return;
+      final hasSession = (StorageService.getToken() ?? '').isNotEmpty;
+      if (hasSession) {
+        setState(() {
+          _currentUserRole = 'tenant';
+          _propertiesFuture = _loadProperties();
+        });
+      }
     }
   }
 
   Future<List<AvailablePropertyItem>> _loadProperties() async {
     final endpoint = _buildPropertiesEndpoint();
     final data = await _apiClient.getList(endpoint);
-    return _toPropertyItems(data, mode: _viewMode);
+    Map<String, Map<String, dynamic>> contractsByProperty = {};
+
+    if (_currentUserRole == 'tenant') {
+      final contracts = await _apiClient.getList(AppConstants.contractsEndpoint);
+      for (final item in contracts) {
+        if (item is! Map<String, dynamic>) continue;
+        final propertyId = (item['property_id'] ?? '').toString();
+        if (propertyId.isEmpty) continue;
+        final current = contractsByProperty[propertyId];
+        if (current == null) {
+          contractsByProperty[propertyId] = item;
+          continue;
+        }
+        final currentDate =
+            DateTime.tryParse((current['created_at'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final itemDate =
+            DateTime.tryParse((item['created_at'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        if (itemDate.isAfter(currentDate)) {
+          contractsByProperty[propertyId] = item;
+        }
+      }
+    }
+
+    return _toPropertyItems(
+      data,
+      mode: _viewMode,
+      contractsByProperty: contractsByProperty,
+    );
   }
 
   List<AvailablePropertyItem> _toPropertyItems(
     List<dynamic> data, {
     required PropertyViewMode mode,
     bool applyOwnerFilter = true,
+    Map<String, Map<String, dynamic>>? contractsByProperty,
   }) {
     final properties = <AvailablePropertyItem>[];
     for (final item in data) {
       if (item is! Map<String, dynamic>) continue;
       final status = (item['status'] ?? '').toString();
-      if (mode == PropertyViewMode.available &&
-          status.isNotEmpty &&
-          status != 'available') {
-        continue;
-      }
       if (mode == PropertyViewMode.mine &&
           applyOwnerFilter &&
           _canUseOwnerView) {
@@ -97,12 +169,23 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
         }
       }
 
+      final propertyId = (item['id'] ?? '').toString();
+      final contract = contractsByProperty?[propertyId];
       properties.add(
         AvailablePropertyItem(
           property: Property.fromJson(item),
           status: status,
           type: (item['type'] ?? '').toString(),
           description: (item['description'] ?? '').toString(),
+          contractId: (contract?['id'] ?? '').toString(),
+          contractStatus: (contract?['status'] ?? '').toString(),
+          contractSignedByTenant:
+              (contract?['signed_by_tenant'] ?? false) == true,
+          contractSignedByLandlord:
+              (contract?['signed_by_landlord'] ?? false) == true,
+          contractEndDate: DateTime.tryParse(
+            (contract?['end_date'] ?? '').toString(),
+          ),
         ),
       );
     }
@@ -112,6 +195,11 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   String _buildPropertiesEndpoint() {
     if (_viewMode == PropertyViewMode.mine && _currentUserRole == 'tenant') {
       return '${AppConstants.propertiesEndpoint}?scope=mine';
+    }
+    final hasSession = (StorageService.getToken() ?? '').isNotEmpty;
+    if (_viewMode == PropertyViewMode.available &&
+        (_currentUserRole == 'tenant' || (hasSession && _currentUserRole != 'guest'))) {
+      return '${AppConstants.propertiesEndpoint}?include_unavailable=1';
     }
     return AppConstants.propertiesEndpoint;
   }
@@ -123,7 +211,7 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
 
       if (_currentUserRole == 'tenant') {
         final availableData = await _apiClient.getList(
-          AppConstants.propertiesEndpoint,
+          '${AppConstants.propertiesEndpoint}?include_unavailable=1',
         );
         availableCount = _toPropertyItems(
           availableData,
@@ -174,114 +262,278 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
   }
 
   Future<void> _requestRental(BuildContext context, Property property) async {
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (c) => const Center(child: CircularProgressIndicator()),
-      );
-
-      final response = await _apiClient.post(
-        AppConstants.contractsEndpoint,
-        body: {'property_id': property.id},
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      final contractId = response['id'];
-      _showContractDialog(context, contractId, property);
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Erreur: ${e.toString().replaceAll("ApiException: ", "")}',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showContractDialog(
-    BuildContext context,
-    String contractId,
-    Property property,
-  ) {
-    showDialog(
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Contrat de location'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Propriete: ${property.title}'),
-              Text('Loyer: ${property.monthlyRent} FCFA/mois'),
-              const SizedBox(height: 16),
-              const Text(
-                'En acceptant, vous vous engagez a louer ce bien selon les termes du contrat standard.',
-                textAlign: TextAlign.justify,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) {
+        bool isSubmitting = false;
+        String? errorText;
+        PlatformFile? signedFile;
+        bool acceptedTerms = false;
+        return StatefulBuilder(
+          builder: (ctx, setStateSheet) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
               ),
-            ],
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Louer: ${property.title}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      property.address,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${property.monthlyRent.toStringAsFixed(0)} FCFA / mois',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: const Text(
+                        'Procedure:\n'
+                        '1. Telechargez le contrat modele.\n'
+                        '2. Imprimez et remplissez-le.\n'
+                        '3. Scannez/convertissez le contrat signe en PDF.\n'
+                        '4. Uploadez le PDF ci-dessous puis envoyez.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final ok = await _downloadContractTemplate(property.id);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              ok
+                                  ? 'Ouverture du contrat modele...'
+                                  : 'Impossible de telecharger le contrat modele',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Telecharger le contrat'),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['pdf'],
+                          withData: true,
+                        );
+                        if (result == null || result.files.isEmpty) return;
+                        setStateSheet(() {
+                          signedFile = result.files.first;
+                        });
+                      },
+                      icon: const Icon(Icons.upload_file),
+                      label: Text(
+                        signedFile == null
+                            ? 'Uploader le contrat rempli (PDF)'
+                            : 'PDF: ${signedFile!.name}',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    CheckboxListTile(
+                      value: acceptedTerms,
+                      onChanged: isSubmitting
+                          ? null
+                          : (value) {
+                              setStateSheet(() {
+                                acceptedTerms = value == true;
+                              });
+                            },
+                      title: const Text('J\'ai lu et approuve le contrat'),
+                      subtitle: const Text(
+                        'Cette case est obligatoire avant l\'envoi du PDF signe.',
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    if (errorText != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        errorText!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (signedFile?.bytes == null ||
+                                    (signedFile?.bytes?.isEmpty ?? true)) {
+                                  setStateSheet(() {
+                                    errorText =
+                                        'Veuillez uploader le contrat rempli en PDF.';
+                                  });
+                                  return;
+                                }
+                                if (!acceptedTerms) {
+                                  setStateSheet(() {
+                                    errorText =
+                                        'Veuillez cocher "J\'ai lu et approuve le contrat" avant l\'envoi.';
+                                  });
+                                  return;
+                                }
+
+                                setStateSheet(() {
+                                  isSubmitting = true;
+                                  errorText = null;
+                                });
+
+                                final submitError = await _submitSignedContract(
+                                  property.id,
+                                  signedFile!,
+                                );
+
+                                if (!mounted) return;
+                                if (submitError != null) {
+                                  setStateSheet(() {
+                                    isSubmitting = false;
+                                    errorText = submitError;
+                                  });
+                                  return;
+                                }
+
+                                if (!ctx.mounted) return;
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Contrat envoye. Patientez la validation du bailleur avant de passer au paiement.',
+                                    ),
+                                  ),
+                                );
+                                await _refresh();
+                              },
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Envoyer la demande'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _rejectContract(contractId);
-            },
-            child: const Text('Refuser', style: TextStyle(color: Colors.red)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _acceptContract(contractId);
-            },
-            child: const Text('Accepter & Signer'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _acceptContract(String contractId) async {
+  Future<bool> _downloadContractTemplate(String propertyId) async {
     try {
-      await _apiClient.post(
-        '${AppConstants.contractsEndpoint}/$contractId/accept',
+      final response = await _apiClient.get(
+        '${AppConstants.propertiesEndpoint}/$propertyId/contract-template',
       );
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Felicitations ! Le logement est loue.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      await _refresh();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la signature: $e')),
-      );
+      final url = (response['download_url'] ?? '').toString();
+      if (url.isEmpty) return false;
+      final uri = Uri.tryParse(url);
+      if (uri == null) return false;
+      return launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      return false;
     }
   }
 
-  Future<void> _rejectContract(String contractId) async {
+  Future<String?> _submitSignedContract(
+    String propertyId,
+    PlatformFile signedFile,
+  ) async {
     try {
-      await _apiClient.post(
-        '${AppConstants.contractsEndpoint}/$contractId/reject',
+      if (signedFile.bytes == null || signedFile.bytes!.isEmpty) {
+        return 'Le PDF selectionne est invalide ou vide.';
+      }
+
+      final lowerName = signedFile.name.toLowerCase();
+      if (!lowerName.endsWith('.pdf')) {
+        return 'Fichier invalide: veuillez choisir un document PDF.';
+      }
+
+      String? contractId;
+      try {
+        final created = await _apiClient.post(
+          AppConstants.contractsEndpoint,
+          body: {'property_id': propertyId},
+        );
+        contractId = (created['id'] ?? '').toString();
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        final isConflict =
+            msg.contains('conflit') ||
+            msg.contains('already') ||
+            msg.contains('deja');
+        if (!isConflict) {
+          final raw = e.toString().trim();
+          if (raw.isNotEmpty) return raw;
+          return "Creation de la demande impossible. Verifiez la connexion et reessayez.";
+        }
+
+        final contracts = await _apiClient.getList(AppConstants.contractsEndpoint);
+        for (final item in contracts) {
+          if (item is! Map<String, dynamic>) continue;
+          final sameProperty = (item['property_id'] ?? '').toString() == propertyId;
+          final status = (item['status'] ?? '').toString().toLowerCase();
+          if (sameProperty && status == 'draft') {
+            contractId = (item['id'] ?? '').toString();
+            break;
+          }
+        }
+      }
+
+      if (contractId == null || contractId.isEmpty) {
+        return "Creation de la demande impossible. Reessayez.";
+      }
+
+      await _apiClient.uploadFile(
+        '${AppConstants.contractsEndpoint}/$contractId/signed-document',
+        bytes: signedFile.bytes!,
+        filename: signedFile.name,
+        mimeType: 'application/pdf',
       );
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Contrat refuse.')));
+
+      return null;
     } catch (e) {
-      // Ignore cleanup errors
+      final raw = e.toString().trim();
+      if (raw.isNotEmpty) return raw;
+      return "Envoi impossible. Verifiez le PDF ou la connexion.";
     }
   }
 
@@ -329,6 +581,10 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
               children: [
                 if (_canUseMineView) _buildViewSwitch(),
                 if (_canUseMineView) const SizedBox(height: 12),
+                if (_viewMode == PropertyViewMode.mine)
+                  _buildContractEndAlerts(properties),
+                if (_viewMode == PropertyViewMode.mine)
+                  const SizedBox(height: 12),
                 if (properties.isEmpty)
                   _buildEmptyState()
                 else
@@ -420,7 +676,7 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
       statusBgColor = const Color(AppColors.accentLight);
       statusTextColor = const Color(AppColors.accent);
     } else if (status == 'rented') {
-      statusLabel = 'Indisponible';
+      statusLabel = 'Sous contrat';
       statusBgColor = Colors.red.shade100;
       statusTextColor = Colors.red.shade800;
     } else if (status == 'maintenance') {
@@ -444,6 +700,8 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
         ? '${property.surface.toStringAsFixed(0)} m2'
         : '';
     final roomsText = property.rooms > 0 ? '${property.rooms} pieces' : '';
+    final contractStatusText = _getContractStatusLabel(item);
+    final hasContractStatus = contractStatusText.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -545,6 +803,68 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
             ],
             const SizedBox(height: 8),
             Text(rentText, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (_viewMode == PropertyViewMode.mine && hasContractStatus) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: Text(
+                  'Statut contrat: $contractStatusText',
+                  style: TextStyle(
+                    color: Colors.blue.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+            if (_viewMode == PropertyViewMode.mine && _currentUserRole == 'tenant') ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _canSubmitPaymentFromContractStatus(item.contractStatus)
+                      ? () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PaymentsScreen(
+                                initialContractId: item.contractId,
+                                initialPropertyLabel:
+                                    item.property.address.isNotEmpty
+                                        ? item.property.address
+                                        : item.property.title,
+                                initialMonthlyRent: item.property.monthlyRent,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  icon: const Icon(Icons.receipt_long),
+                  label: Text(
+                    _canSubmitPaymentFromContractStatus(item.contractStatus)
+                        ? 'Payer et envoyer une preuve'
+                        : 'Paiement disponible apres validation du contrat',
+                  ),
+                ),
+              ),
+              if (!_canSubmitPaymentFromContractStatus(item.contractStatus)) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Veuillez patienter: le bailleur doit valider le contrat avant le paiement.',
+                  style: TextStyle(
+                    color: Colors.orange.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
             if (item.description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(item.description),
@@ -572,6 +892,97 @@ class _AvailablePropertiesScreenState extends State<AvailablePropertiesScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getContractStatusLabel(AvailablePropertyItem item) {
+    final status = item.contractStatus.toLowerCase();
+
+    if (status == 'active') {
+      return 'Valide';
+    }
+    if (status == 'terminated') {
+      return 'Rejete ou resilie';
+    }
+    if (status == 'expired') {
+      return 'Expire';
+    }
+    if (status == 'draft') {
+      if (item.contractSignedByTenant && !item.contractSignedByLandlord) {
+        return 'En attente de validation du bailleur';
+      }
+      if (!item.contractSignedByTenant) {
+        return 'Brouillon (signature locataire manquante)';
+      }
+      return 'Brouillon';
+    }
+    return status.isEmpty ? '' : status;
+  }
+
+  bool _canSubmitPaymentFromContractStatus(String contractStatus) {
+    final status = contractStatus.toLowerCase();
+    return status == 'active';
+  }
+
+  Widget _buildContractEndAlerts(List<AvailablePropertyItem> items) {
+    final now = DateTime.now();
+    final alerts = items.where((item) {
+      if (item.contractStatus.toLowerCase() != 'active') return false;
+      final end = item.contractEndDate;
+      if (end == null) return false;
+      final days = end.difference(now).inDays;
+      return days <= 30;
+    }).toList()
+      ..sort((a, b) {
+        final aDays = (a.contractEndDate ?? now).difference(now).inDays;
+        final bDays = (b.contractEndDate ?? now).difference(now).inDays;
+        return aDays.compareTo(bDays);
+      });
+
+    if (alerts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(AppConstants.defaultPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Alertes fin de contrat',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            ...alerts.take(6).map((item) {
+              final end = item.contractEndDate!;
+              final days = end.difference(now).inDays;
+              final expired = days < 0;
+              final color = expired ? Colors.red : Colors.orange;
+              final label = expired
+                  ? 'Contrat expire depuis ${days.abs()} jour(s)'
+                  : 'Contrat se termine dans ${days + 1} jour(s)';
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.shade50,
+                  border: Border.all(color: color.shade200),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$label - ${item.property.address}',
+                  style: TextStyle(
+                    color: color.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            }),
           ],
         ),
       ),

@@ -63,21 +63,41 @@ class PaymentService {
     }
   }
 
-  /// Create a manual payment entry for a future month.
+  /// Create a targeted payment for a specific contract/property.
   Future<ManualPaymentResult> createManualPayment({
-    required DateTime dueMonth,
-    required double amount,
+    required String contractId,
+    required int monthsCount,
+    required DateTime paymentDate,
+    required DateTime coverageStartDate,
+    required double amountPaid,
+    String paymentMethod = 'bank_transfer',
     Uint8List? proofBytes,
     String? proofMimeType,
     String? proofFileName,
   }) async {
     try {
-      final dueDate = DateTime(dueMonth.year, dueMonth.month, 1);
       final created = await _apiClient.post(
         '${AppConstants.paymentsEndpoint}/manual',
-        body: {'amount': amount, 'due_date': dueDate.toIso8601String()},
+        body: {
+          'contract_id': contractId,
+          'months_count': monthsCount,
+          'payment_date': paymentDate.toIso8601String(),
+          'coverage_start_date': coverageStartDate.toIso8601String(),
+          'amount_paid': amountPaid,
+          'payment_method': paymentMethod,
+        },
       );
       final paymentId = created['id']?.toString();
+      if (paymentId != null && paymentId.isNotEmpty) {
+        await _apiClient.put(
+          '${AppConstants.paymentsEndpoint}/$paymentId',
+          body: {
+            'status': 'pending',
+            'payment_method': paymentMethod,
+            'payment_date': paymentDate.toIso8601String().split('T').first,
+          },
+        );
+      }
       if (paymentId != null &&
           paymentId.isNotEmpty &&
           proofBytes != null &&
@@ -102,6 +122,7 @@ class PaymentService {
   /// Submit payment proof or mark payment as pending
   Future<bool> makePayment(
     String paymentId, {
+    String paymentMethod = 'bank_transfer',
     Uint8List? proofBytes,
     String? proofMimeType,
     String? proofFileName,
@@ -111,6 +132,7 @@ class PaymentService {
         '${AppConstants.paymentsEndpoint}/$paymentId',
         body: {
           'status': 'pending',
+          'payment_method': paymentMethod,
           'payment_date': DateTime.now().toIso8601String().split('T').first,
         },
       );
@@ -129,6 +151,16 @@ class PaymentService {
       return false;
     }
   }
+
+  Future<bool> deletePayment(String paymentId) async {
+    try {
+      await _apiClient.delete('${AppConstants.paymentsEndpoint}/$paymentId');
+      return true;
+    } catch (e) {
+      debugPrint('Delete payment error: $e');
+      return false;
+    }
+  }
 }
 
 class ManualPaymentResult {
@@ -140,17 +172,45 @@ class ManualPaymentResult {
 
 String _friendlyManualPaymentError(Object error) {
   final raw = error.toString();
-  if (raw.contains('next month')) {
+  final lower = raw.toLowerCase();
+
+  if (lower.contains('next month') ||
+      lower.contains('mois prochain') ||
+      lower.contains('paiement manuel autorise uniquement')) {
     return 'Le paiement manuel est autorise uniquement pour le mois prochain.';
   }
-  if (raw.contains('No active contract')) {
+  if (lower.contains('no active contract') ||
+      lower.contains('aucun contrat actif')) {
     return 'Aucun contrat actif trouve pour ce compte.';
   }
-  if (raw.contains('already exists')) {
-    return 'Un paiement existe deja pour ce mois.';
+  if (lower.contains('contrat cible est requis') ||
+      lower.contains('contract_id is required')) {
+    return 'Selectionnez la maison/contrat a payer puis reessayez.';
   }
-  if (raw.contains('Permission denied')) {
+  if (lower.contains('nombre de mois') || lower.contains('months_count')) {
+    return 'Nombre de mois invalide.';
+  }
+  if (lower.contains('montant verse') || lower.contains('amount_paid')) {
+    return 'Somme versee invalide.';
+  }
+  if (lower.contains('already exists') ||
+      lower.contains('existe deja') ||
+      lower.contains('conflit detecte')) {
+    return 'Un paiement existe deja pour cette periode.';
+  }
+  if (lower.contains('permission denied') ||
+      lower.contains('action bloquee') ||
+      lower.contains('rls')) {
     return 'Permission refusee. Verifiez la policy RLS des paiements.';
+  }
+  if (lower.contains('montant invalide') || lower.contains('invalid payment amount')) {
+    return 'Montant invalide. Saisissez un montant superieur a zero.';
+  }
+  if (lower.contains('session') && lower.contains('expire')) {
+    return 'Session expiree. Reconnectez-vous puis reessayez.';
+  }
+  if (raw.trim().isNotEmpty) {
+    return raw.replaceAll('ApiException: ', '').trim();
   }
   return 'Creation impossible du paiement manuel.';
 }

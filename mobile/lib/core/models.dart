@@ -299,12 +299,20 @@ class MaintenanceRequest {
 class DashboardData {
   final Tenant tenant;
   final Property property;
+  final String contractId;
+  final String contractStatus;
+  final bool contractSignedByTenant;
+  final bool contractSignedByLandlord;
   final List<Payment> upcomingPayments;
   final int pendingMaintenanceRequests;
 
   DashboardData({
     required this.tenant,
     required this.property,
+    this.contractId = '',
+    this.contractStatus = '',
+    this.contractSignedByTenant = false,
+    this.contractSignedByLandlord = false,
     required this.upcomingPayments,
     required this.pendingMaintenanceRequests,
   });

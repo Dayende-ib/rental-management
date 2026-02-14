@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "../services/api";
 import { Bell, Check, Info, AlertTriangle, XCircle } from "lucide-react";
 import PaginationControls from "../components/PaginationControls";
+import useRealtimeRefresh from "../hooks/useRealtimeRefresh";
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -33,6 +34,10 @@ export default function Notifications() {
   useEffect(() => {
     fetchNotifications(page);
   }, [page, fetchNotifications]);
+
+  useRealtimeRefresh(() => {
+    fetchNotifications(page);
+  }, ["notifications", "payments", "contracts", "maintenance", "properties", "tenants", "users"]);
 
   const markRead = async (id) => {
     try {

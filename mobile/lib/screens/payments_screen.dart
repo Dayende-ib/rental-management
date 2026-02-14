@@ -4,15 +4,52 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../core/models.dart';
 import '../core/providers/payment_providers.dart';
 
-class PaymentsScreen extends ConsumerWidget {
-  const PaymentsScreen({super.key});
+class PaymentsScreen extends ConsumerStatefulWidget {
+  final String initialContractId;
+  final String initialPropertyLabel;
+  final double initialMonthlyRent;
+
+  const PaymentsScreen({
+    super.key,
+    this.initialContractId = '',
+    this.initialPropertyLabel = '',
+    this.initialMonthlyRent = 0,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PaymentsScreen> createState() => _PaymentsScreenState();
+}
+
+class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
+  final ApiClient _apiClient = ApiClient();
+  bool _openingSubmitSheet = false;
+  bool _seededInitialIntent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialContractId.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _seededInitialIntent) return;
+      _seededInitialIntent = true;
+      ref.read(openPaymentSubmitIntentProvider.notifier).state =
+          PaymentSubmitIntent(
+            open: true,
+            contractId: widget.initialContractId,
+            propertyLabel: widget.initialPropertyLabel,
+            monthlyRent: widget.initialMonthlyRent,
+          );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final submitIntent = ref.watch(openPaymentSubmitIntentProvider);
     final overviewAsync = ref.watch(paymentOverviewProvider);
     final paymentsAsync = ref.watch(paymentsProvider);
 
@@ -28,30 +65,35 @@ class PaymentsScreen extends ConsumerWidget {
         ],
       ),
       body: overviewAsync.when(
-        data: (overview) => RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(paymentOverviewProvider);
-            ref.invalidate(paymentsProvider);
-          },
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.all(AppConstants.defaultPadding),
-            children: [
-              _buildPaymentRuleInfoCard(),
-              const SizedBox(height: 12),
-              _buildUpcomingSection(context, ref, overview),
-              const SizedBox(height: 16),
-              _buildPaidSection(context, overview.paidPayments),
-              const SizedBox(height: 16),
-              _buildStatusTrackingSection(
-                context,
-                ref,
-                paymentsAsync,
-                overview,
-              ),
-            ],
-          ),
-        ),
+        data: (overview) {
+          _maybeOpenSubmitFromIntent(context, ref, submitIntent);
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(paymentOverviewProvider);
+              ref.invalidate(paymentsProvider);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.all(AppConstants.defaultPadding),
+              children: [
+                _buildPaymentRuleInfoCard(),
+                const SizedBox(height: 12),
+                _buildSubscriptionAlertsSection(paymentsAsync),
+                const SizedBox(height: 12),
+                _buildUpcomingSection(context, ref, overview),
+                const SizedBox(height: 16),
+                _buildPaidSection(context, overview.paidPayments),
+                const SizedBox(height: 16),
+                _buildStatusTrackingSection(
+                  context,
+                  ref,
+                  paymentsAsync,
+                  overview,
+                ),
+              ],
+            ),
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
@@ -70,6 +112,28 @@ class PaymentsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _maybeOpenSubmitFromIntent(
+    BuildContext context,
+    WidgetRef ref,
+    PaymentSubmitIntent intent,
+  ) {
+    if (!intent.open || _openingSubmitSheet) return;
+    _openingSubmitSheet = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      ref.read(openPaymentSubmitIntentProvider.notifier).state =
+          const PaymentSubmitIntent();
+      await _openCreateManualPaymentSheet(
+        context,
+        ref,
+        contractId: intent.contractId,
+        propertyLabel: intent.propertyLabel,
+        monthlyRent: intent.monthlyRent,
+      );
+      _openingSubmitSheet = false;
+    });
   }
 
   Widget _buildStatusTrackingSection(
@@ -253,7 +317,7 @@ class PaymentsScreen extends ConsumerWidget {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     Text(
-                      '${(payment.amount + payment.lateFee).toStringAsFixed(0)} FCFA',
+                      '${_effectiveAmount(payment).toStringAsFixed(0)} FCFA',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -322,7 +386,7 @@ class PaymentsScreen extends ConsumerWidget {
           Text('Echeance: ${_formatDate(payment.dueDate)}'),
           const SizedBox(height: 6),
           Text(
-            '${(payment.amount + payment.lateFee).toStringAsFixed(0)} FCFA',
+            '${_effectiveAmount(payment).toStringAsFixed(0)} FCFA',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -360,8 +424,81 @@ class PaymentsScreen extends ConsumerWidget {
               label: Text(_ctaLabel(payment)),
             ),
           ),
+          if (_canDeletePayment(payment)) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _deletePayment(context, ref, payment),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Supprimer ce paiement'),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildSubscriptionAlertsSection(AsyncValue<List<Payment>> paymentsAsync) {
+    return paymentsAsync.when(
+      data: (payments) {
+        final now = DateTime.now();
+        final alerts = payments.where((p) {
+          final settled = p.status == 'paid' || p.validationStatus == 'validated';
+          if (settled) return false;
+          final days = p.dueDate.difference(now).inDays;
+          return days <= 10;
+        }).toList()
+          ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+        if (alerts.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Card(
+          child: Padding(
+            padding: EdgeInsets.all(AppConstants.defaultPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Alertes fin d\'abonnement',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 10),
+                ...alerts.take(6).map((p) {
+                  final days = p.dueDate.difference(now).inDays;
+                  final expired = days < 0;
+                  final color = expired ? Colors.red : Colors.orange;
+                  final text = expired
+                      ? 'Abonnement expire depuis ${days.abs()} jour(s)'
+                      : 'Abonnement se termine dans ${days + 1} jour(s)';
+                  return Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.shade50,
+                      border: Border.all(color: color.shade200),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$text - ${p.month}',
+                      style: TextStyle(
+                        color: color.shade800,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -458,6 +595,7 @@ class PaymentsScreen extends ConsumerWidget {
     Payment payment,
   ) async {
     _SelectedProof? selectedProof;
+    String paymentMethod = 'bank_transfer';
     bool isSubmitting = false;
     String? errorText;
 
@@ -495,6 +633,35 @@ class PaymentsScreen extends ConsumerWidget {
                         'Ajoutez une preuve (image) pour faciliter la validation.',
                       ),
                       const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: paymentMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'Moyen de paiement',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'bank_transfer',
+                            child: Text('Virement bancaire'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'mobile_money',
+                            child: Text('Mobile money'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'card',
+                            child: Text('Carte'),
+                          ),
+                        ],
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                if (value == null || value.isEmpty) return;
+                                setModalState(() {
+                                  paymentMethod = value;
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: () async {
                           final picked = await _pickProofImage();
@@ -527,6 +694,14 @@ class PaymentsScreen extends ConsumerWidget {
                           onPressed: isSubmitting
                               ? null
                               : () async {
+                                  if (selectedProof == null) {
+                                    setModalState(() {
+                                      errorText =
+                                          'Veuillez ajouter la photo de preuve du paiement.';
+                                    });
+                                    return;
+                                  }
+
                                   setModalState(() {
                                     isSubmitting = true;
                                     errorText = null;
@@ -538,6 +713,7 @@ class PaymentsScreen extends ConsumerWidget {
 
                                   final ok = await paymentService.makePayment(
                                     payment.id,
+                                    paymentMethod: paymentMethod,
                                     proofBytes: selectedProof?.bytes,
                                     proofFileName: selectedProof?.fileName,
                                     proofMimeType: selectedProof?.mimeType,
@@ -591,14 +767,48 @@ class PaymentsScreen extends ConsumerWidget {
   Future<void> _openCreateManualPaymentSheet(
     BuildContext context,
     WidgetRef ref,
+    {String contractId = '',
+    String propertyLabel = '',
+    double monthlyRent = 0,}
   ) async {
+    var effectiveContractId = contractId.trim();
+    var effectivePropertyLabel = propertyLabel;
+    var effectiveMonthlyRent = monthlyRent;
+
+    if (effectiveContractId.isEmpty) {
+      final picked = await _pickTargetContract(context);
+      if (picked == null) return;
+      effectiveContractId = (picked['id'] ?? '').toString();
+      effectivePropertyLabel = (picked['label'] ?? '').toString();
+      effectiveMonthlyRent = (picked['monthly_rent'] as num?)?.toDouble() ?? 0;
+    }
+
+    final monthsController = TextEditingController(text: '1');
+    final amountController = TextEditingController();
     String amountText = '';
+    String monthsText = '1';
+    String paymentMethod = 'bank_transfer';
     _SelectedProof? selectedProof;
     String? errorText;
     bool isSubmitting = false;
+    DateTime paymentInstant = DateTime.now();
+    DateTime coverageStartDate = DateTime(
+      paymentInstant.year,
+      paymentInstant.month,
+      paymentInstant.day,
+    );
 
-    final now = DateTime.now();
-    final nextMonth = DateTime(now.year, now.month + 1, 1);
+    void syncAutoAmount() {
+      final months = int.tryParse(monthsController.text.trim()) ?? 1;
+      if (effectiveMonthlyRent <= 0) return;
+      final computed = (effectiveMonthlyRent * months).toStringAsFixed(0);
+      amountController.text = computed;
+      amountText = computed;
+    }
+
+    if (effectiveMonthlyRent > 0) {
+      syncAutoAmount();
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -623,29 +833,148 @@ class PaymentsScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Ajouter un paiement manuel',
+                        'Paiement locataire',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Mois cible: ${nextMonth.month.toString().padLeft(2, '0')}/${nextMonth.year}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      if (effectivePropertyLabel.isNotEmpty)
+                        Text(
+                          'Bien: $effectivePropertyLabel',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: monthsController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre de mois a payer',
+                          hintText: 'Ex: 3',
+                        ),
+                        onChanged: (value) {
+                          setModalState(() {
+                            monthsText = value;
+                            syncAutoAmount();
+                          });
+                        },
                       ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Text(
+                          'Date paiement (instant): ${_formatDateTime(paymentInstant)}',
+                          style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: modalContext,
+                            initialDate: coverageStartDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked == null) return;
+                          setModalState(() {
+                            coverageStartDate = DateTime(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                            );
+                          });
+                        },
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          'Date debut abonnement: ${_formatDate(coverageStartDate)}',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (_) {
+                          final months = int.tryParse(monthsText) ?? 1;
+                          final endDate = _computeCoverageEndDate(
+                            coverageStartDate,
+                            months,
+                          );
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.blue.shade100),
+                            ),
+                            child: Text(
+                              'Date fin abonnement calculee: ${_formatDate(endDate)}',
+                              style: TextStyle(
+                                color: Colors.blue.shade800,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      if (effectiveMonthlyRent > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Reference loyer: ${effectiveMonthlyRent.toStringAsFixed(0)} FCFA / mois',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextFormField(
+                        controller: amountController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                         decoration: const InputDecoration(
-                          labelText: 'Montant (FCFA)',
-                          hintText: 'Ex: 75000',
+                          labelText: 'Somme nette a payer (FCFA)',
+                          hintText: 'Ex: 75000 (auto calcule si loyer connu)',
                         ),
                         onChanged: (value) {
                           amountText = value;
                         },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: paymentMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'Moyen de paiement',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'bank_transfer',
+                            child: Text('Virement bancaire'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'mobile_money',
+                            child: Text('Mobile money'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'card',
+                            child: Text('Carte'),
+                          ),
+                        ],
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                if (value == null || value.isEmpty) return;
+                                setModalState(() {
+                                  paymentMethod = value;
+                                });
+                              },
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
@@ -659,7 +988,7 @@ class PaymentsScreen extends ConsumerWidget {
                         icon: const Icon(Icons.photo_library_outlined),
                         label: Text(
                           selectedProof == null
-                              ? 'Ajouter une preuve (optionnel)'
+                              ? 'Ajouter une preuve (obligatoire)'
                               : 'Preuve: ${selectedProof!.fileName}',
                         ),
                       ),
@@ -671,6 +1000,31 @@ class PaymentsScreen extends ConsumerWidget {
                             color: Colors.red,
                             fontWeight: FontWeight.w600,
                           ),
+                        ),
+                      ],
+                      if (effectiveMonthlyRent > 0) ...[
+                        const SizedBox(height: 10),
+                        Builder(
+                          builder: (_) {
+                            final months = int.tryParse(monthsText) ?? 1;
+                            final expected = effectiveMonthlyRent * months;
+                            return Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.teal.shade100),
+                              ),
+                              child: Text(
+                                'Calcul: ${months.clamp(1, 24)} mois x ${effectiveMonthlyRent.toStringAsFixed(0)} = ${expected.toStringAsFixed(0)} FCFA',
+                                style: TextStyle(
+                                  color: Colors.teal.shade800,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -686,7 +1040,22 @@ class PaymentsScreen extends ConsumerWidget {
                                   if (amount == null || amount <= 0) {
                                     setModalState(() {
                                       errorText =
-                                          'Veuillez entrer un montant valide.';
+                                          'Veuillez entrer une somme versee valide.';
+                                    });
+                                    return;
+                                  }
+                                  final months = int.tryParse(monthsText.trim());
+                                  if (months == null || months < 1 || months > 24) {
+                                    setModalState(() {
+                                      errorText =
+                                          'Le nombre de mois doit etre compris entre 1 et 24.';
+                                    });
+                                    return;
+                                  }
+                                  if (selectedProof == null) {
+                                    setModalState(() {
+                                      errorText =
+                                          'Veuillez ajouter la photo de preuve du paiement.';
                                     });
                                     return;
                                   }
@@ -701,8 +1070,12 @@ class PaymentsScreen extends ConsumerWidget {
                                   );
                                   final result = await paymentService
                                       .createManualPayment(
-                                        dueMonth: nextMonth,
-                                        amount: amount,
+                                        contractId: effectiveContractId,
+                                        monthsCount: months,
+                                        paymentDate: paymentInstant,
+                                        coverageStartDate: coverageStartDate,
+                                        amountPaid: amount,
+                                        paymentMethod: paymentMethod,
                                         proofBytes: selectedProof?.bytes,
                                         proofFileName: selectedProof?.fileName,
                                         proofMimeType: selectedProof?.mimeType,
@@ -728,7 +1101,7 @@ class PaymentsScreen extends ConsumerWidget {
                                   ).showSnackBar(
                                     const SnackBar(
                                       content: Text(
-                                        'Paiement ajoute avec succes.',
+                                        'Paiement envoye au bailleur pour validation.',
                                       ),
                                     ),
                                   );
@@ -753,6 +1126,91 @@ class PaymentsScreen extends ConsumerWidget {
         );
       },
     );
+    monthsController.dispose();
+    amountController.dispose();
+  }
+
+  Future<Map<String, dynamic>?> _pickTargetContract(BuildContext context) async {
+    try {
+      final raw = await _apiClient.getList(AppConstants.contractsEndpoint);
+      final activeContracts = raw
+          .whereType<Map<String, dynamic>>()
+          .where(
+            (c) =>
+                (c['status'] ?? '').toString().toLowerCase() == 'active',
+          )
+          .toList();
+      if (activeContracts.isEmpty) {
+        if (!context.mounted) return null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucun contrat actif disponible pour creer un paiement.'),
+          ),
+        );
+        return null;
+      }
+
+      if (activeContracts.length == 1) {
+        final c = activeContracts.first;
+        return {
+          'id': (c['id'] ?? '').toString(),
+          'label': (c['properties']?['address'] ??
+                  c['properties']?['title'] ??
+                  'Bien')
+              .toString(),
+          'monthly_rent': (c['monthly_rent'] as num?) ?? 0,
+        };
+      }
+
+      if (!context.mounted) return null;
+      return await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ListTile(
+                  title: Text(
+                    'Choisir la maison a payer',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                ...activeContracts.map((c) {
+                  final label = (c['properties']?['address'] ??
+                          c['properties']?['title'] ??
+                          'Bien')
+                      .toString();
+                  final contractId = (c['id'] ?? '').toString();
+                  final shortId = contractId.length > 8
+                      ? contractId.substring(0, 8)
+                      : contractId;
+                  return ListTile(
+                    title: Text(label),
+                    subtitle: Text('Contrat $shortId'),
+                    onTap: () {
+                      Navigator.pop(ctx, {
+                        'id': contractId,
+                        'label': label,
+                        'monthly_rent': (c['monthly_rent'] as num?) ?? 0,
+                      });
+                    },
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (_) {
+      if (!context.mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de charger les contrats actifs.'),
+        ),
+      );
+      return null;
+    }
   }
 
   Future<_SelectedProof?> _pickProofImage() async {
@@ -816,6 +1274,69 @@ class PaymentsScreen extends ConsumerWidget {
 
   String _formatDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  String _formatDateTime(DateTime date) =>
+      '${_formatDate(date)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+  DateTime _computeCoverageEndDate(DateTime startDate, int months) {
+    final safeMonths = months < 1 ? 1 : months;
+    return DateTime(
+      startDate.year,
+      startDate.month + safeMonths,
+      startDate.day,
+    ).subtract(const Duration(days: 1));
+  }
+
+  double _effectiveAmount(Payment payment) {
+    final paid = payment.amountPaid;
+    if (paid > 0) return paid + payment.lateFee;
+    return payment.amount + payment.lateFee;
+  }
+
+  bool _canDeletePayment(Payment payment) {
+    return payment.validationStatus != 'validated' && payment.status != 'paid';
+  }
+
+  Future<void> _deletePayment(
+    BuildContext context,
+    WidgetRef ref,
+    Payment payment,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer ce paiement ?'),
+        content: const Text(
+          'Cette action supprimera la demande de paiement pour que vous puissiez recommencer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    final ok = await ref.read(paymentServiceProvider).deletePayment(payment.id);
+    if (!context.mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Suppression impossible. Reessayez.')),
+      );
+      return;
+    }
+    ref.invalidate(paymentOverviewProvider);
+    ref.invalidate(paymentsProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Paiement supprime.')),
+    );
+  }
 }
 
 class _StatusMeta {
